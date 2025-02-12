@@ -1,0 +1,210 @@
+
+<div class="content zerorightmargin">
+    <?php
+    if ($this->session->flashdata('success')) {
+        $msg = $this->session->flashdata('success');
+        ?>
+        <div class="notice outer">
+            <div class="note"><?php echo $msg; ?>
+            </div>
+        </div>
+    <?php
+    }
+    ?>
+    <?php
+    if (isset($country_data) && !empty($country_data)) {
+        foreach ($country_data as $cdata) {
+            if (($cdata['short_code'] == $lang_id)) {
+                if(isset($cdata['coming_soon_image']) && $cdata['coming_soon_image'] != '') {
+                    $comingsoon = global_img_link($cdata['coming_soon_image'], 'uploads/country/coming_soon/');
+                } else {
+                    $comingsoon = base_url() . 'assets/frontend/images/coming_soon.jpg';
+                }
+                if(isset($cdata['no_image']) && $cdata['no_image'] != '') {
+                    $noimage = global_img_link($cdata['no_image'], 'uploads/country/no_image/');
+                } else {
+                    $noimage = base_url() . 'assets/admin/images/previewimage.jpg';
+                }              
+            }
+        }
+    }
+    ?>
+    <div id="show_class" class="note displaynon"></div>
+    <div id="result"></div>
+    <div class="outer">
+        <div class="inner">
+            <div class="page-header">
+                <!-- page title -->
+                <!-- End page title -->
+                <div class="body">
+
+                    <form action="<?php echo base_url(); ?>admin/<?php echo $lang_id; ?>/part_relation/index" method="post" enctype="multipart/form-data">
+                    <!-- Content container -->
+                    <div class="container">
+                        <!-- Default datatable -->
+                        <div class="block well margintop-30px">
+                            <div class="navbar">
+                                <div class="navbar-inner">
+                                    <h5><?php echo $admin_products['part_relation_list']['front']; ?></h5>
+                                    <div class="control-group row-fluid width50_float_left">
+                                        <form action="<?php echo base_url(); ?>admin/<?php echo $lang_id; ?>/part_relation/index" method="post"
+                                            enctype="multipart/form-data" class="form-horizontal">
+                                            <div class="controls">
+                                                <input type="search" id="search" name="search" value="<?php echo $search; ?>" class="focustip span6"/>
+                                                <span class="red1"></span>
+                                                <input type="submit" id="search" value="<?php echo $admin_static_links['search']['front']; ?>" name="Submit" class="btn btn-primary"/>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    <?php if (isset($access['page_add']) && $access['page_add'] == 1) { ?>
+                                        <div class="dataTables_length" id="data-table_length">
+                                            <label>
+                                                <div id="" class="selector">
+                                                    <a class="floatright" tabindex="0"
+                                                       id="data-table_first"
+                                                       href="admin/<?php echo $lang_id; ?>/part_relation/add_part_relation"><?php echo $admin_static_links['static_add']['front']; ?></a>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    <?php } ?>
+                                </div>
+                            </div>
+                            <div class="table-overflow">
+                                <div id="data-table_wrapper" class="dataTables_wrapper" role="grid">
+                                    <table aria-describedby="data-table_info" class="table table-striped dataTable"
+                                           id="data-table">
+                                        <thead>
+                                        <tr role="row">
+                                            <th><input type="checkbox" id="checkall" class="checkall"
+                                                       onchange="$('.rowitemdelete').prop('checked',this.checked);">
+                                            </th>
+                                            <th><?php echo $admin_products['slno']['front']; ?></th>
+                                            <th><?php echo $admin_products['part_name']['front']; ?></th>
+                                            <th><?php echo $admin_products['kgt_ref']['front']; ?></th>
+                                            <th><?php echo $admin_products['product_group']['front']; ?></th>
+                                            <th><?php echo $admin_products['quantity']['front']; ?></th>
+                                            <th><?php echo $admin_products['country']['front']; ?></th>
+                                            <th><?php echo $admin_products['status']['front']; ?></th>
+                                        </tr>
+                                        </thead>
+
+                                        <tbody aria-relevant="all" aria-live="polite" role="alert">
+                                        <?php if (empty($all_data)) { ?>
+                                            <tr class="odd">
+                                                <td class="dataTables" valign="top" colspan="5"><?php echo $admin_static_links['no_data_available']['front']; ?></td>
+                                            </tr>
+                                        <?php } ?>
+
+                                        <?php
+                                        if(isset($offset)) {
+                                            $i = $offset + 1;
+                                        }
+                                        else {
+                                            $i = 1;
+                                        }
+                                        if (isset($all_data)) {
+                                            foreach ($all_data as $set_data) {
+                                                ?>
+                                                <tr class="odd">
+                                                    <td><input type="checkbox" id="checkitem" class="rowitemdelete"
+                                                               name="deleteitem[]"
+                                                               value="<?php echo $set_data['id']; ?>"></td>
+                                                    <td class="dataTables" valign="top">
+                                                        <?php echo $i; ?>
+                                                    </td>
+                                                    <td class="dataTables" valign="top">
+                                                        <?php if(isset($set_data['lang_part_name']) && $set_data['lang_part_name'] != '') { ?>
+                                                            <?php echo $set_data['lang_part_name']; ?>
+                                                        <?php } else { ?>
+                                                            <?php echo $set_data['part_name']; ?>
+                                                        <?php } ?>
+                                                    </td>
+                                                    <td class="dataTables" valign="top">
+                                                        <?php echo $set_data['kgt_ref_number']; ?>
+                                                    </td>
+                                                    
+                                                    <td class="dataTables" valign="top">
+                                                        <?php if(isset($set_data['lang_product_type_name']) && $set_data['lang_product_type_name'] != '') { ?>
+                                                            <?php echo $set_data['lang_product_type_name']; ?>
+                                                        <?php } else { ?>
+                                                            <?php echo $set_data['product_type_name']; ?>
+                                                        <?php } ?>
+                                                    </td>
+                                                    
+                                                    <td class="dataTables" valign="top">
+                                                        <?php echo $set_data['quantity']; ?>
+                                                    </td>
+
+                                                    <td class="dataTables" valign="top">
+                                                        <?php if(isset($set_data['lang_countryName']) && $set_data['lang_countryName'] != '') { ?>
+                                                            <?php echo $set_data['lang_countryName']; ?>
+                                                        <?php } else { ?>
+                                                            <?php echo $set_data['countryName']; ?>
+                                                        <?php } ?>
+                                                    </td>
+
+                                                    <td class="dataTables" valign="top">
+                                                        <?php if ($set_data['status'] == "0") {
+                                                                echo $admin_static_links['unpublished']['front'];
+                                                            } else {
+                                                                echo $admin_static_links['published']['front'];
+                                                            } ?>
+                                                    </td>
+                                                    <td class="dataTables" valign="top">
+                                                        <?php if (isset($access['page_edit']) && $access['page_edit'] == 1) { ?>
+                                                        <a href="admin/<?php echo $lang_id; ?>/part_relation/edit_part_relation/<?php echo $set_data['id']; ?>"><?php echo $admin_static_links['static_edit']['front']; ?></a>&nbsp;&nbsp;
+                                                        <?php } ?>
+                                                        <?php if (isset($access['page_delete']) && $access['page_delete'] == 1) { ?>
+                                                        <a href="admin/<?php echo $lang_id; ?>/part_relation/delete_part_relation/<?php echo $set_data['id']; ?>"
+                                                           onclick="return confirm_box();"><?php echo $admin_static_links['static_delete']['front']; ?></a>
+                                                        <?php } ?>
+                                                    </td>
+                                                </tr>
+                                                <?php
+                                                $i++;
+                                            }
+                                        }
+                                        ?>
+
+                                        <tr>
+                                            <td colspan="17">
+                                                <?php if (isset($access['page_delete']) && $access['page_delete'] == 1) { ?>
+                                                <input type="submit" id="DeleteSelected" value="<?php echo $admin_static_links['delete_selected']['front']; ?>" name="DeleteSelected" class="btn btn-primary" onclick="return confirm_box();"/>
+                                                <input type="submit" id="DeleteAll" value="<?php echo $admin_static_links['delete_all']['front']; ?>" name="DeleteAll" class="btn btn-primary" onclick="return confirm_box();"/>
+                                                 <?php } ?>
+                                                <?php if(isset($links)) { ?>
+                                                    <p class="floatright"><?php echo $links; ?></p>
+                                                <?php } ?>
+                                            </td>
+                                        </tr>
+
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- /default datatable -->
+
+
+                        <!-- Pickers -->
+                    </div>
+
+                    <!-- /pickers -->
+                    </form>
+                </div>
+                <!-- /content container -->
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function confirm_box() {
+        var answer = confirm("<?php echo $admin_static_links['are_you_sure']['front']; ?>");
+        if (!answer)
+            return false;
+    }
+
+</script>

@@ -1,0 +1,2875 @@
+<?php
+
+if (!defined('BASEPATH')) {
+    exit('No direct script access allowed');
+}
+
+/**
+ * products
+ * This Class Handle all functions related to products on front end. List Catdisable_multiselectegory, models, makers and all products list is handles by this class only.
+ */
+class products extends MY_Controller
+{
+
+    /**
+     * __construct
+     *
+     *  All helpers, models and libraries those we need to use in the controller are initialized in the constructor.
+     * @return void
+     */
+    public function __construct()
+    {
+
+        parent::__construct();
+        $this->load->helper('security');
+        $this->load->model(array('product_model', 'comman_model', 'product_items_model', 'part_relation_model'));
+        $this->load->helper(array('assets', 'cart_helper', 'common_helper'));
+    }
+
+    /**
+     * index
+     *
+     * This function display  the first page of the product section on front end. This Function Display products categories and product type to choose for next step.
+     * @link https://estorename.kondarsoft.com/en/products
+     * @param  mixed $categoryId
+     * @return void
+     */
+    public function index($categoryId = '')
+    {
+        //echo "Index page";return;exit;
+        log_message('debug', 'index called');
+
+        // Check user logged or not
+        logged_user_validation();
+        $loggedUserId = getFrontenduserId();
+        // unset  session variables related to product
+        $this->session->unset_userdata('vehicle_category_id');
+        $this->session->unset_userdata('search_cat');
+        //$this->session->unset_userdata('filter_option');
+        $this->session->unset_userdata('maker_id');
+        $this->session->unset_userdata('model_id');
+        $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+        $this->session->unset_userdata('product_type');
+        $this->session->unset_userdata('maker_cat_id_pair');
+        $this->session->unset_userdata('search_by');
+        $this->session->unset_userdata('searchMakerIds');
+        $this->session->unset_userdata('searchModelIds');
+        $this->session->unset_userdata('search_engine_size');
+        $this->session->unset_userdata('isQSearch');
+        $this->session->unset_userdata('cat_mak_group');
+
+        $this->session->unset_userdata('ctp_orderid');
+        $this->session->unset_userdata('click_pay_message');
+        $this->session->unset_userdata('click_pay_error');
+        $this->session->unset_userdata('payment_api_error');
+        $current_cart_user_data=array();
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+
+        // get default home page list data category or maker
+        $hide_category = isset($all_data['quick_search_hide_category']) ? $all_data['quick_search_hide_category'] : 0;
+        // set session for category enabled or not based on the admin selection
+        $this->session->set_userdata('hide_category', $hide_category);
+
+        $num_vehicle_type_for_menu = $num_makers = 0;
+        $vehicle_category_ids = $vehicle_categories = $makers_list = $maker_ids = array();
+        if ($hide_category == 1) {
+            $num_makers = $this->comman_model->num_maker_type_for_menu();
+        } else {
+            // this code  get list of categories and count  for product page
+            $vehicle_category_ids = $categoryId ? array_filter(explode(',', $categoryId)) : array();
+            $product_type_id = array();
+            $num_vehicle_type_for_menu = $this->comman_model->num_vehicle_type_for_menu($vehicle_category_ids, $product_type_id);
+        }
+
+        // this code  get list of product types and count  for product page
+        $num_product_type_for_menu = $this->comman_model->num_product_type_for_menu();
+        if ($this->config->item('hide_product_list') == "0" && ($this->config->item('product_list_show_to_guest_user') == "1" || !empty($loggedUserId))) {
+            $num_product_list = $this->product_model->num_product_list_home();
+        }
+
+        // this code  get list of industry and count of industry
+        if ($this->config->item('hide_industry') == "0") {
+            $industry_list = $this->comman_model->get_industry_for_menu();
+            $num_industry_list = $this->comman_model->num_get_industry_for_menu();
+
+        }
+
+        $category_menus = getVehicleCategoryList($this->lang->default_lang_id);
+        $brand_menus = $this->comman_model->get_maker_type_for_menu(); 
+        $banner_images = $this->comman_model->get_all_data_by_id_desc('banner_images',array('status'=>1));       
+
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        // this code  get data from database abd session which is required for view file
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+
+        $pageData = array(
+            'title' => get_page_title('product_page'),
+            'pageType' => 'products',
+            'pageFrom' => 'product-home',
+            'productsdropdown' => true,
+            'timestamp' => date_timestamp_get(date_create()),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'current_cart_user_data' => $current_cart_user_data,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'cartcount' => getcartcount($cart),
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'vehicle_categories' => $vehicle_categories,
+            'num_vehicle_type_for_menu' => $num_vehicle_type_for_menu,
+            'num_product_type_for_menu' => $num_product_type_for_menu,
+            'industry_list' => $industry_list,
+            'num_industry_list' => $num_industry_list,
+            'num_makers' => $num_makers,
+            'num_product_list' => $num_product_list,
+            'maker_ids' => $maker_ids,
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+     
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0");  
+        $pageData['category_menu'] = $category_menus;
+        $pageData['brand_menu'] = $brand_menus;
+        $pageData['banner_images'] = $banner_images;
+
+       // echo $_SERVER['REQUEST_URI'].$_SERVER['SCRIPT_NAME'];
+      // echo '<pre>'; print_r($_SERVER); exit;
+        // echo '<pre>';print_r($pageData);exit;
+        // This function loads view of the products page
+        $this->load->view('common/products_header', $pageData);
+        $this->load->view('product/product', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+  //AR Add a new method to check MySQL time
+  public function check_mysql_time() {
+
+       
+        // if (ENVIRONMENT === 'development') {
+        //       $this->db->query("SET time_zone = '-08:00'");
+        // } else {
+        //       $this->db->query("SET time_zone = 'America/Los_Angeles'");
+        // }
+    
+    // Run the query to get the current MySQL time
+            $query1 = $this->db->query("SELECT NOW() AS time_now;");
+            $result1 = $query1->row();
+    
+            $query2 = $this->db->query("SELECT @@session.time_zone AS time_zone;");
+            $result2 = $query2->row();
+    
+            echo "MySQL Time Zone: " . $result2->time_zone . "<br>";
+            echo "Current MySQL Time: " . $result1->time_now;
+    
+        }
+    
+    /**
+     * index
+     *
+     * This function display  the first page of the product section on front end. This Function Display products categories and product type to choose for next step.
+     * @link https://estorename.kondarsoft.com/en/products
+     * @param  mixed $categoryId
+     * @return void
+     */
+    public function product_group($product_type_id = '')
+    {
+
+        // Check user logged or not
+        logged_user_validation();
+
+        if ($product_type_id) {
+
+            $this->session->unset_userdata('vehicle_category_id');
+            $this->session->unset_userdata('search_cat');
+            //$this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('maker_id');
+            $this->session->unset_userdata('model_id');
+            $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+            $this->session->unset_userdata('product_type');
+            $this->session->unset_userdata('maker_cat_id_pair');
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('searchMakerIds');
+            $this->session->unset_userdata('searchModelIds');
+            $this->session->unset_userdata('search_engine_size');
+            $this->session->unset_userdata('isQSearch');
+
+            $product_type_id = array($product_type_id);
+
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => array_filter($product_type_id), 'search_by' => 'product_type'));
+
+        } else {
+
+            $product_type_id = $this->session->userdata('product_type');
+        }
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+
+        // get default home page list data category or maker
+        $hide_category = isset($all_data['quick_search_hide_category']) ? $all_data['quick_search_hide_category'] : 0;
+        // set session for category enabled or not based on the admin selection
+        $this->session->set_userdata('hide_category', $hide_category);
+
+        // this code  get list of product types and count  for product page
+        $menu_product_types = $this->comman_model->product_types_all($product_type_id);
+        $num_product_type_for_menu = $this->comman_model->product_types_all_count($product_type_id);
+        // echo "<pre>";print_r($menu_product_types);die;
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        // this code  get data from database abd session which is required for view file
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+
+        $pageData = array(
+            'title' => get_page_title('product_page'),
+            'pageType' => 'products',
+            'pageFrom' => 'product-home',
+            'productsdropdown' => true,
+            'timestamp' => date_timestamp_get(date_create()),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'current_cart_user_data' => $current_cart_user_data,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'menu_instruction' => $this->comman_model->GetAllDataLangByid("menu", 'id', '1', $this->lang->default_lang_id, 'menu_country'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'cartcount' => getcartcount($cart),
+            'menu_product_types' => $menu_product_types,
+            'num_product_type_for_menu' => $num_product_type_for_menu,
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        // This function loads view of the products page
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_group', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    /**
+     * product_maker
+     *
+     * This function Display product maker page on the behalf of selected category or maker.
+     * @link https://estorename.kondarsoft.com/en/products/product_maker
+     * @param  mixed $vehicle_category_id
+     * @param  mixed $selected_maker_id
+     * @return void
+     */
+    public function product_maker($selected_maker_id = '')
+    {
+        // echo "<pre>";print_r($this->input->post());print_r($this->session);die;
+        // Check user logged or not
+        logged_user_validation();
+        $this->comman_model->update_column('home_page',array(),array('quick_search_hide_category'=>'0'));
+        // this function check input values and if input value in not valid than it show error
+        if (empty($selected_maker_id)) {
+            if (count($_POST) > 0) {
+                $csrf = $this->security->xss_clean($this->input->post('Csrf-Token'));
+                if ($this->input->post('product_type_id')) {
+                    $vehicle_ids = $this->security->xss_clean($this->input->post('product_type_id'));
+                    $aVeh_id = $this->security->xss_clean($this->input->post('product_type_id[0]'));
+                } else {
+                    $vehicle_ids = $this->security->xss_clean($this->input->post('vehicle_category_id'));
+                    $aVeh_id = $this->security->xss_clean($this->input->post('vehicle_category_id[0]'));
+                }
+                if ($this->input->post('filter_option')) {
+                    $this->session->set_userdata('filter_option', $this->input->post('filter_option'));
+                }
+                $cart_block_timer = str_replace("/", '$', $this->security->xss_clean($this->input->post('cart_block_timer')));
+                $pattern = '/[\'^£$%&*()}{@#~?><>:.,|=_+¬-]/';
+                // Shows this error to hacker or unknown person if not proper input value
+                // if (preg_match($pattern, $csrf) || preg_match($pattern, $cart_block_timer) || preg_match($pattern, $aVeh_id) || !is_numeric($cart_block_timer) || !is_array($vehicle_ids)) {
+                //     show_error('Request was invalid. Try Again! <p><a href="javascript:history.go(-1)" title="Return to the previous page">&laquo; Go back</a></p>', 400);
+                //     exit;
+                // }
+            }
+        }
+
+        $this->session->unset_userdata('search_engine_size');
+
+        if (!empty($selected_maker_id)) {
+
+            $this->session->unset_userdata('vehicle_category_id');
+            $this->session->unset_userdata('search_cat');
+            //$this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('maker_id');
+            $this->session->unset_userdata('model_id');
+            $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+            $this->session->unset_userdata('product_type');
+            $this->session->unset_userdata('maker_cat_id_pair');
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('searchMakerIds');
+            $this->session->unset_userdata('searchModelIds');
+            $this->session->unset_userdata('isQSearch');
+
+            $selected_maker_id = array($selected_maker_id);
+            $vehicle_category_ids = $this->product_model->get_product_category_by_maker_id($selected_maker_id);
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+        } else if (empty($_POST)) {
+            $selected_maker_id = $this->session->userdata('maker_id');
+        } else {
+            $this->session->unset_userdata('maker_id');
+        }
+
+        // set session  values related to some product  section variables
+        $this->session->unset_userdata('model_id');
+        $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+        $filter_option = ($this->session->userdata('filter_option')) ? $this->session->userdata('filter_option') : "";
+
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+        $br2 = false; //addiditional part of breadcrumbs
+        $makerIdsRelationVal = array();
+        //if all params in url
+        if ($selected_maker_id) {
+
+            $maker_ids = $selected_maker_id;
+            $this->session->set_userdata(array('maker_id' => $maker_ids));
+
+            if ($this->session->userdata('hide_category') == 1) {
+                $vehicle_category_ids = $this->product_model->get_product_category_by_maker_id($selected_maker_id);
+                $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+            }
+
+            $makerIdsRelationVal = $maker_ids;
+        }
+        //end if all params in url
+
+        if ($this->input->post('filter_option') == "industry-type") {
+
+            $industry_type = $this->security->xss_clean($this->input->post('industry_type'));
+            $vehicle_category_ids = $this->comman_model->get_category_by_industry($industry_type);
+
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+            $this->session->set_userdata(array('industry_type' => $industry_type));
+
+            unset($_POST['product_type_id']);
+        } else if ($this->input->post('vehicle_category_id')) { //this is vehicle_category_id's
+            $vehicle_category_ids = $this->security->xss_clean($this->input->post('vehicle_category_id'));
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+            unset($_POST['product_type_id']);
+            if ($this->session->userdata('search_by') == "product_type") {
+                $pdtTypeIds = array_unique(array_filter($this->session->userdata('product_type')));
+
+                // print_r($makerIdsRelationVal);
+                // exit;
+            }
+        } else if ($this->input->post('product_type_id_drp')) {
+
+            $product_type_id = $this->security->xss_clean($this->input->post('product_type_id_drp'));
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => array_filter($product_type_id), 'search_by' => 'product_type'));
+        } else if ($this->input->post('product_type_id')) {
+
+            $product_type_id = $this->security->xss_clean($this->input->post('product_type_id'));
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => array_filter($product_type_id), 'search_by' => 'product_type'));
+        } else if (empty($vehicle_category_ids)) {
+            redirect('products');
+        }
+
+        $total_selected_vehicle_categories = $this->product_model->getMakerListByCategoryCount($vehicle_category_ids);
+        $selected_vehicle_categories = $this->product_model->getMakerListByCategoryId($vehicle_category_ids);
+
+        // this function generate breadcrumb for the view
+        $breadcrumbs = $this->breadcrumb();
+        $breadcrumb = $breadcrumbs[0] . $breadcrumbs[1];
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+
+        $pageData = array(
+            'title' => get_page_title('product_maker_page'),
+            'pageType' => 'productmaker',
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'session_data' => $this->session->all_userdata(),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'selected_vehicle_categories' => $selected_vehicle_categories,
+            'total_selected_vehicle_categories' => $total_selected_vehicle_categories,
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'filter_option' => $filter_option,
+            'maker_ids' => isset($maker_ids) ? $maker_ids : array(),
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0");
+
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_maker', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    /**
+     * product_model
+     * This function Display product models  on the behalf of selected category , maker and model.
+     * @param  mixed $vehicle_category_id
+     * @param  mixed $maker_id
+     * @param  mixed $model_id
+     * @return void
+     */
+    public function product_model($maker_id = '', $model_id = '')
+    {
+        // Check user logged or not
+        //print_r($_POST);exit;
+        logged_user_validation();
+        //echo $maker_id."<>".$model_id;exit;
+       
+                
+        // echo $model_id;
+        // echo $maker_id;exit;
+
+        $modelIdcheck = "no";
+        // this function check input values and if input value in not valid than it show error
+        if (!empty($model_id)) {
+            if (count($_POST) > 0) {
+                $csrf = $this->security->xss_clean($this->input->post('Csrf-Token'));
+                $cart_block_timer = str_replace("/", '$', $this->security->xss_clean($this->input->post('cart_block_timer')));
+                $maker_id = $this->security->xss_clean($this->input->post('maker_id'));
+                $aMaker_id = $this->security->xss_clean($this->input->post('maker_id[0]'));
+                $pattern = '/[\'^£$%&*()}{@#~?><>:.,|=_+¬-]/';
+                if ($this->input->post('filter_option')) {
+                    $this->session->set_userdata('filter_option', $this->input->post('filter_option'));
+                }
+                // Shows this error to hacker or unknown person if not proper input value
+                if (preg_match($pattern, $csrf) || preg_match($pattern, $cart_block_timer) || preg_match($pattern, $aMaker_id) || !is_numeric($cart_block_timer) || !is_array($maker_id)) {
+                    show_error('Request was invalid. Try Again! <p><a href="javascript:history.go(-1)" title="Return to the previous page">&laquo; Go back</a></p>', 400);
+                    exit;
+                }
+            }
+            $modelIdcheck = "yes";
+        }
+
+        $this->session->unset_userdata('search_engine_size');
+
+        // this function check category , maker and model inputs values and set array in the session for all
+        if ($maker_id && $model_id) {
+            
+            $this->session->unset_userdata('vehicle_category_id');
+            $this->session->unset_userdata('search_cat');
+            $this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('maker_id');
+            $this->session->unset_userdata('model_id');
+            $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+            $this->session->unset_userdata('product_type');
+            $this->session->unset_userdata('maker_cat_id_pair');
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('searchMakerIds');
+            $this->session->unset_userdata('searchModelIds');
+            $this->session->unset_userdata('isQSearch');
+
+            $maker_id = array($maker_id);
+            $model_id = array($model_id);
+
+            $vehicle_category_ids = $this->product_model->get_product_category_by_maker_id($maker_id);
+
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+            // set maker ids in the session
+            $this->session->set_userdata(array('maker_id' => $maker_id));
+
+            // set model  ids in the session
+            $this->session->set_userdata(array('model_id' => $model_id));
+
+            $this->session->unset_userdata('search_by');
+        }
+
+        // get categories ids from the session and saved in a variable
+        $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+        // get maker ids from the session and saved in a variable
+        $maker_id = $this->session->userdata('maker_id');
+
+        // get model ids from the session and saved in a variable
+        $model_id = $this->session->userdata('model_id');
+
+        $modelIdsRelationVal = array();
+
+        unset($_POST['maker_id_dropdown']);
+        // if input maker id is not empty than this code executes
+        if ($this->input->post('maker_id_dropdown')) {
+            $makers = array_filter($this->security->xss_clean($this->input->post('maker_id_dropdown')));
+
+            $single_array = array();
+            foreach ($makers as $single_val) {
+                $single_array = explode('#', $single_val);
+                $all_makers[] = $single_array[0];
+            }
+
+            $_cat_makers = $this->product_model->getMakers($all_makers);
+            
+            foreach ($makers as $key => $complex) {
+                // this function explode input value and get maker and category from value and add in to the array
+                $maker = explode('#', $complex);
+
+                if ($maker[1] == "all") {
+                    $category_id = explode(',', $_cat_makers[$key])[0];
+
+                } else {
+                    $category_id = $maker[1];
+
+                }
+
+                $maker_id_array[] = $maker[0];
+                $vehicle_id_array[] = $category_id;
+                $cat_mak_group[$category_id][] = $maker[0];
+
+                $maker_cat_id_pair[] = array('maker_id' => $maker[0]);
+            }
+            $this->session->set_userdata(array('cat_mak_group' => $cat_mak_group));
+
+            // for getting all category id and match with corresponding maker id
+            if ($this->session->userdata('hide_category') == 1) {
+                $this->session->set_userdata(array('maker_cat_id_pair' => $maker_cat_id_pair));
+            }
+            // after prepare makers and category ids update session values
+            $maker_id = array_unique(array_filter($maker_id_array));
+            $this->session->set_userdata(array('maker_id' => $maker_id));
+            $vehicle_category_ids = array_unique(array_filter($vehicle_id_array));
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+            $product_type_id = $this->session->userdata('product_type');
+
+            //echo '<pre> maker=>';print_r($maker_id);echo 'vehicle category';print_r($vehicle_category_ids);echo 'product_type';print_r($product_type_id);exit;
+
+        } else if ($this->input->post('maker_id')) {
+            
+            $makers = array_filter($this->security->xss_clean($this->input->post('maker_id')));
+            
+            // this function iterate each input values
+            $maker_id_array = $maker_cat_id_pair = $cat_mak_group = array();
+            foreach ($makers as $complex) {
+                // this function explode input value and get maker and category from value and add in to the array
+                $maker = explode('#', $complex);
+                $maker_id_array[] = $maker[0];
+                if($maker[1]=='all'){
+                    $categories_list = getVehicleCategoryList($this->lang->default_lang_id);
+                    foreach($categories_list as $cat){
+                        $vehicle_id_array[] = $cat['id'];
+                    }                    
+                }else{
+                    foreach(explode(",",$maker[1]) as $m){
+                        $vehicle_id_array[] = $m;
+                        $cat_mak_group[$m][] = $maker[0];
+                    }
+                    
+                }
+                // print_r($maker_id_array);print_r($vehicle_id_array);print_r($cat_mak_group);die();
+                //$cat_mak_group[$maker[1]][] = $maker[0];
+                //print_r($cat_mak_group);exit;
+                $maker_cat_id_pair[] = array('maker_id' => $maker[0]);
+                //print_r($maker_cat_id_pair);exit;
+            }
+            $this->session->set_userdata(array('cat_mak_group' => $cat_mak_group));
+
+            // for getting all category id and match with corresponding maker id
+            if ($this->session->userdata('hide_category') == 1) {
+                $this->session->set_userdata(array('maker_cat_id_pair' => $maker_cat_id_pair));
+            }
+
+            // after prepare makers and category ids update session values
+            $maker_id = array_unique(array_filter($maker_id_array));
+            $this->session->set_userdata(array('maker_id' => $maker_id));
+            $vehicle_category_ids = array_unique(array_filter($vehicle_id_array));
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+            $product_type_id = $this->session->userdata('product_type');
+        }
+
+        // echo "<pre>";
+        // print_r($vehicle_id_array);
+        // print_r($maker_id);print_r($vehicle_category_ids);echo "product-type";print_r($product_type_id);die();
+
+        // if category id is empty than this code exectue and  redirects to products page
+        if (empty($vehicle_category_ids)) {
+            redirect('products');
+        }
+        // if maket id is empty than this code exectue and  redirects to products page
+        if (empty($maker_id)) {
+            redirect('products/product_maker');
+        }
+        
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+        
+        // $this->session->set_userdata('maker_id',$maker_id);
+         $this->session->set_userdata('model_id',$model_id);
+        // $this->session->set_userdata('maker_cat_id_pair',$maker_cat_id_pair);
+        $session_data        = $this->session->all_userdata();
+        //print_r($session_data);exit;
+        $modelList = updateLanguageParameters($this->product_model->get_model_by_makers_details($modelIdsRelationVal, 0, $this->lang->default_lang_id));
+        // print_r($modelList);exit;
+        // this function generate breadcrumb for the view
+        $breadcrumbs = $this->breadcrumb();
+        $breadcrumb = $breadcrumbs[0] . $breadcrumbs[1];
+
+        //END re-make breadcrumbs as #Product section van - truck/ air  filter --> van  - brake lining --> truck
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+
+        $pageData = array(
+            'title' => get_page_title('product_model_page'),
+            'pageType' => 'productmodel',
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'session_data' => $this->session->all_userdata(),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'menu_vehicle_categories' => $this->comman_model->all_data('tbl_vehicle_categories'),
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'maker_id' => $maker_id,
+            'model_id' => $model_id,
+            'modelList' => $modelList,
+            'modelIdcheck' => $modelIdcheck,
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0");
+
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_model', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    public function maker_details($maker_id = '')
+    {
+        
+        // Check user logged or not
+        logged_user_validation();
+        $modelIdsRelationVal = array($maker_id);
+        $this->session->set_userdata('maker_id', $modelIdsRelationVal);
+        $this->session->unset_userdata('vehicle_category_id');
+        // $this->session->set_userdata('hide_category',1);
+        //print_r($modelIdsRelationVal);exit;
+        $modelList = updateLanguageParameters($this->product_model->get_model_by_makerId($maker_id, $this->lang->default_lang_id));
+        $this->comman_model->update_column('home_page',array(),array('quick_search_hide_category'=>'1'));
+        // this function generate breadcrumb for the view
+        $breadcrumbs = $this->breadcrumb();
+        foreach ($breadcrumbs as $key => $value) {
+            if (empty($value)) {
+                unset($breadcrumbs[$key]);
+            }
+        }
+        //echo  '<pre>';print_r($breadcrumbs);
+        $breadcrumb = $breadcrumbs[0] . $breadcrumbs[1];
+        //echo $breadcrumb; exit;
+        //END re-make breadcrumbs as #Product section van - truck/ air  filter --> van  - brake lining --> truck
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+
+        $pageData = array(
+            'title' => get_page_title('product_model_page'),
+            'pageType' => 'productmodel',
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'session_data' => $this->session->all_userdata(),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'menu_vehicle_categories' => $this->comman_model->all_data('tbl_vehicle_categories'),
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'maker_id' => $maker_id,
+            'model_id' => $model_id,
+            'modelList' => $modelList,
+            'modelIdcheck' => $modelIdcheck,
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0");
+
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_model', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    public function category_details($category_id = '')
+    {
+        // echo "<pre>";print_r($this->input->post());print_r($this->session);die;
+        // Check user logged or not
+        logged_user_validation();
+
+        $vehicle_category_ids = array($category_id);
+        //print_r($vehicle_category_ids);
+        $selected_vehicle_categories = $this->product_model->getMakerListByCategoryId($vehicle_category_ids);
+        $this->session->unset_userdata('maker_id');
+        $this->session->unset_userdata('cat_mak_group');
+        $this->session->unset_userdata('model_id');
+        $this->session->set_userdata('vehicle_category_id',$vehicle_category_ids);
+        $this->comman_model->update_column('home_page',array(),array('quick_search_hide_category'=>'0'));
+        $maker_id = array();
+        // $this->session->set_userdata('maker_id');
+        // echo '<pre>';print_r($selected_vehicle_categories);exit;
+        // this function generate breadcrumb for the view
+        //$breadcrumbs = $this->breadcrumb();
+        //$breadcrumb = $breadcrumbs[0] . $breadcrumbs[1];
+       // print_r($this->session->userdata);exit;
+	    $breadcrumb = "<a>".$selected_vehicle_categories[0]['category_name']."</a>";
+
+	    $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+
+        $pageData = array(
+            'title' => get_page_title('product_maker_page'),
+            'pageType' => 'productmaker',
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'session_data' => $this->session->all_userdata(),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'selected_vehicle_categories' => $selected_vehicle_categories,
+            'total_selected_vehicle_categories' => count($selected_vehicle_categories),
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'filter_option' => $filter_option,
+            'maker_ids' => isset($maker_ids) ? $maker_ids : array(),
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0");
+
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_maker', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+
+	/**
+     * product_items
+     *
+     * This function Display product type page on the behalf of selected category , maker and model.
+     * @param  mixed $product_type_id
+     * @return void
+     */
+    public function product_items($product_type_id = '')
+    {
+        // Check user logged or not
+        logged_user_validation();
+        
+        // this code save post input values in the variable
+        $vehicle_category_id = $this->input->post('cid');
+        $maker_id = $this->input->post('maid');
+        $model_id = $this->input->post('moid');
+        // this function check input values and if input value in not valid than it show error
+        if (count($_POST) > 0) {
+            $csrf = $this->security->xss_clean($this->input->post('Csrf-Token'));
+            $cart_block_timer = str_replace("/", '$', $this->security->xss_clean($this->input->post('cart_block_timer')));
+            $model_id = $this->security->xss_clean($this->input->post('model_id'));
+            $aModel_id = $this->security->xss_clean($this->input->post('model_id[0]'));
+            $pattern = '/[\'^£$%&*()}{@#~?><>:.,|=_+¬-]/';
+            // Shows this error to hacker or unknown person if not proper input value
+            if (preg_match($pattern, $csrf) || preg_match($pattern, $cart_block_timer) || preg_match($pattern, $aModel_id) || !is_numeric($cart_block_timer) || !is_array($model_id)) {
+                show_error('Request was invalid. Try Again! <p><a href="javascript:history.go(-1)" title="Return to the previous page">&laquo; Go back</a></p>', 400);
+                exit;
+            }
+        }
+
+        $this->session->unset_userdata('search_engine_size');
+
+        $all_data_s = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+
+        // get default home page list data category or maker
+        $hide_category = isset($all_data_s['quick_search_hide_category']) ? $all_data_s['quick_search_hide_category'] : 0;
+        // set session for category enabled or not based on the admin selection
+        $this->session->set_userdata('hide_category', $hide_category);
+
+        // this code update product types in the session
+        $product_type_id = $product_type_id ? explode(',', $product_type_id) : array();
+        if ($product_type_id) {
+            $this->session->set_userdata(array('product_type' => $product_type_id));
+        }
+        // $product_type_id = $this->session->userdata('product_type');
+
+        $offset = 0;
+
+        if ($vehicle_category_id && $maker_id && $model_id) {
+
+            $vehicle_category_ids = explode(',', $vehicle_category_id);
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+            $maker_id = explode(',', $maker_id);
+            $this->session->set_userdata(array('maker_id' => $maker_id));
+
+            $model_id = explode(',', $model_id);
+            $this->session->set_userdata(array('model_id' => $model_id));
+            $this->session->unset_userdata('search_by');
+        } else {
+            
+            $get_active_vehicle_category_ids = array_filter($this->input->post('model_id'));
+            
+            foreach($get_active_vehicle_category_ids as $combi_data){
+                $combin_array = explode("#",$combi_data);
+                $selected_models[] = $combin_array[1];
+            }
+            // print_r($selected_models);
+            $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+            $get_selected_category_ids = $this->comman_model->get_all_data_by_id('tbl_models','id in ('.implode(",",$selected_models).')');
+            $vehicle_category_ids = array();
+            foreach($get_selected_category_ids as $selecte_ids){
+                $vehicle_category_ids[] = $selecte_ids['vehicle_category_id'];
+            }
+            // print_r($get_selected_category_ids);exit;
+            //$vehicle_category_ids = array_filter(array_unique($vehicle_category_ids));
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+            $maker_id = $this->session->userdata('maker_id');
+            $maker_id = array_filter(array_unique($maker_id));
+            $this->session->set_userdata(array('maker_id' => $maker_id));
+
+            $model_id = $this->session->userdata('model_id');
+            $model_id = $model_id ? array_filter(array_unique($model_id)) : '';
+            $this->session->set_userdata(array('model_id' => $model_id));
+            $product_type_id = $this->session->userdata('product_type');
+        }
+
+        // if category id is empty than this code exectue and  redirects to products page
+        if (empty($vehicle_category_ids)) {
+            redirect('products');
+        }
+
+        // if maker id is empty than this code exectue and  redirects to products page
+        if (empty($maker_id)) {
+            redirect('products/product_maker');
+        }
+
+        // if input model id is not empty than this code executes
+        if ($this->input->post('model_id')) {
+
+            // Add new condition on the 7 march 2022
+            $search_by = $this->session->userdata('search_by');
+            if ($search_by != 'product_type') {
+                $this->session->unset_userdata('product_type');
+                $product_type_id = array();
+            }
+
+            $model_id = $this->security->xss_clean($this->input->post('model_id'));
+            $model_id = array_diff($model_id, array(''));
+            $maker_id_array = array();
+            $model_id_array = array();
+            // this function iterate each input values
+            foreach ($model_id as $complex_val) {
+                $temp = explode('#', $complex_val);
+                $model_id_array[] = $temp[1];
+                $maker_id_array[] = $temp[0];
+            }
+
+            $maker_id_array = array_filter(array_unique($maker_id_array));
+            $model_id_array = array_filter(array_unique($model_id_array));
+
+            // set model and maker ids in the session
+            $model_id = $model_id_array;
+            $this->session->set_userdata(array('model_id' => $model_id_array));
+
+            $maker_id = $maker_id_array;
+            $this->session->set_userdata(array('maker_id' => $maker_id_array));
+        }
+
+        // if model id array is empty than this code exectue and  redirects to products model  page
+        if (empty($model_id)) {
+            redirect('products/product_model');
+        }
+
+        // if search_by session value is equal to the product_type  than this code exectue and  redirects to products list  page
+        $search_by = $this->session->userdata('search_by');
+
+        if ($search_by == 'product_type') {
+            redirect('products/product_list');
+        }
+
+        $productgroup = updateLanguageParameters($this->product_model->get_product_types_from_model(0, $this->lang->default_lang_id));
+
+        // echo "<pre>";
+        // print_r($productgroup);
+        // exit;
+
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        // this function generate breadcrumb for the view
+        $bread_data = $this->breadcrumb();
+        $breadcrumb = $bread_data[0] . $bread_data[1] . $bread_data[2];
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+
+        $pageData = array(
+            'title' => get_page_title('product_list_page'),
+            'pageType' => 'productitems',
+            'productsdropdown' => true,
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'session_data' => $this->session->all_userdata(),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'offset' => $offset,
+            'product_type_id' => $product_type_id,
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'maker_id' => $maker_id,
+            'model_id' => $model_id,
+            'vehicle_maker_id_and_cat_id_pair' => $vehicle_maker_id_and_cat_id_pair,
+            'productgroup' => $productgroup,
+            'menu_vehicle_categories' => $this->comman_model->all_data('tbl_vehicle_categories'),
+            'menu_product_types' => $this->comman_model->get_product_type_for_menu(),
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0");
+
+        // this function load view of product type page
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_items', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    /**
+     * product_list
+     * This function Display product list  page on the behalf of selected category , maker , model and product type.
+     * @param  mixed $kgt_ref_number
+     * @param  mixed $selected_maker_id
+     * @param  mixed $selected_model_id
+     * @return void
+     */
+    public function product_list($kgt_ref_number = '', $selected_maker_id = '', $selected_model_id = '')
+    {
+
+        $kgt_ref_number = urldecode($kgt_ref_number);
+        logged_user_validation();
+
+        if (empty(getFrontenduserId()) && $this->config->item('product_list_show_to_guest_user') != "1") {
+            redirect('user/signup', 'refresh');
+        }
+
+        // this function check input values and if input value in not valid than it show error
+        if (count($_POST) > 0) {
+            $csrf = $this->security->xss_clean($this->input->post('Csrf-Token'));
+            $cart_block_timer = $this->input->post('cart_block_timer') ? str_replace("/", '$', $this->security->xss_clean($this->input->post('cart_block_timer'))) : 0;
+            $pattern = '/[\'^£$%&*()}{@#~?><>:.,|=_+¬-]/';
+            // Shows this error to hacker or unknown person if not proper input value
+            if (preg_match($pattern, $csrf) || preg_match($pattern, $cart_block_timer) || !is_numeric($cart_block_timer)) {
+                show_error('Request was invalid. Try Again! <p><a href="javascript:history.go(-1)" title="Return to the previous page">&laquo; Go back</a></p>', 400);
+                exit;
+            }
+        }
+
+        $productselected = false;
+        $offset = 0;
+        $returnAllProduct = 0;
+
+        
+
+        // If user clicked the submit button from the quick search form this function will execute.
+        if ($this->input->post('quick_search')) {
+
+            //on submit of quick search for this code executed
+            $this->session->unset_userdata('maker_id');
+            $this->session->unset_userdata('model_id');
+            $this->session->unset_userdata('product_type');
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('qProduct_year');
+            $this->session->unset_userdata('qCategoryId');
+            $this->session->unset_userdata('qMakerId');
+            $this->session->unset_userdata('qModelId');
+            $this->session->unset_userdata('qProductTypeId');
+            $this->session->unset_userdata('isQSearch');
+            $this->session->unset_userdata('qSearchType');
+            $this->session->unset_userdata('qEngineSize');
+            $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+            $this->session->unset_userdata('search_engine_size');
+            $this->session->unset_userdata('vehicle_category_id');
+
+            // get category id from quickseach and save in the session
+            $hide_category = $this->session->userdata('hide_category');
+            if ($hide_category == 0) {
+                $vehicle_category_ids = array_slice($this->input->post('vehicle_category_ids'), 0, 1);
+                $engine_size = $product_year = array();
+            } else {
+                $vehicle_category_ids = $this->comman_model->product_valid_category();
+                // get maker id from quickseach and save in the session
+                $product_year = array_slice($this->input->post('model_year'), 0, 1);
+                $engine_size = array_slice($this->input->post('engine_size'), 0, 1);
+
+                $this->session->set_userdata(array('search_engine_size' => implode($engine_size)));
+            }
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+            // get maker id from quickseach and save in the session
+            $maker_id = array_slice($this->input->post('maker_id'), 0, 1);
+            $this->session->set_userdata(array('maker_id' => $maker_id));
+
+            // get model id from quickseach and save in the session
+            $model_id = array_slice($this->input->post('model_id'), 0, 1);
+            $this->session->set_userdata(array('model_id' => $model_id));
+
+            // get product type  id from quickseach and save in the session
+            $product_type = $this->input->post('product_type_id');
+            $this->session->set_userdata(array('product_type' => $product_type));
+
+            // make category maker and model pair array and saved in the session
+            $vehicle_maker_id_and_cat_id_pair[] = array('maker_id' => $maker_id[0], 'model_id' => $model_id[0], 'product_type' => $product_type[0]);
+            $this->session->set_userdata(array('vehicle_maker_id_and_cat_id_pair' => $vehicle_maker_id_and_cat_id_pair));
+
+            $this->session->set_userdata(array('qProduct_year' => $product_year, 'qCategoryId' => $vehicle_category_ids, 'qMakerId' => $maker_id, 'qModelId' => $model_id, 'qProductTypeId' => $product_type, 'qSearchType' => $this->input->post('searchtype'), 'qEngineSize' => $engine_size, 'isQSearch' => $this->input->post('quick_search')));
+
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('cart_selected_dropdowns');
+        } else if ($this->input->post('model_id')) {
+
+            $this->session->unset_userdata('qProduct_year');
+            $this->session->unset_userdata('qEngineSize');
+            $this->session->unset_userdata('qProductTypeId');
+
+            // Add new condition on the 7 march 2022
+            $search_by = $this->session->userdata('search_by');
+            if ($search_by != 'product_type') {
+                $this->session->unset_userdata('product_type');
+                $product_type_id = array();
+            }
+            $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+
+            $model_id = $this->security->xss_clean($this->input->post('model_id'));
+            $model_id = array_diff($model_id, array(''));
+
+            $maker_id_array = array();
+            $model_id_array = array();
+            // this function iterate each input values
+            foreach ($model_id as $complex_val) {
+                $temp = explode('#', $complex_val);
+                $model_id_array[] = $temp[1];
+                $maker_id_array[] = $temp[0];
+            }
+
+            $maker_id_array = array_filter(array_unique($maker_id_array));
+            $model_id_array = array_filter(array_unique($model_id_array));
+
+            // set model and maker ids in the session
+            $model_id = $model_id_array;
+            $this->session->set_userdata(array('model_id' => $model_id_array));
+
+            $maker_id = $maker_id_array;
+            $this->session->set_userdata(array('maker_id' => $maker_id_array));
+        } else {
+            // if user refresh the product list page this code set category, maker, model and product type ids in the session
+            $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+            $maker_id = $this->session->userdata('maker_id');
+            $model_id = $this->session->userdata('model_id');
+            $product_type = $this->session->userdata('product_type');
+            $this->session->unset_userdata('search_engine_size');
+            $this->session->unset_userdata('isQSearch');
+
+            $this->session->unset_userdata('qProduct_year');
+            $this->session->unset_userdata('qEngineSize');
+            $this->session->unset_userdata('qProductTypeId');
+        }
+
+        $session_data = array(
+            'vehicle_category_id' => $vehicle_category_ids,
+            'maker_id' => $maker_id,
+            'model_id' => $model_id,
+        );
+
+        // if search by product number is empty than this code execute and check session data exists are not.
+        if ($kgt_ref_number == '') {
+            //  if category id array is empty than this code exectue and  redirects to products   page
+            if (empty($vehicle_category_ids)) {
+                redirect('products');
+            }
+
+            // if maker id array is empty than this code exectue and  redirects to products maker  page
+            if (empty($maker_id)) {
+                redirect('products/product_maker');
+            }
+
+            //  if model id array is empty than this code exectue and  redirects to products model  page
+            if (empty($model_id)) {
+                redirect('products/product_model');
+            }
+        }
+
+        // if user search the products by product number from the search box this script will execute, else it will execute script based on stored session data.
+        $searchItemValue = '';
+        $searchItemType = "";
+        $searchModelIds = $searchMakerIds = array();
+        $this->session->unset_userdata('searchMakerIds');
+        $this->session->unset_userdata('searchModelIds');
+        if ($kgt_ref_number != '' && $kgt_ref_number != 'select') {
+
+            // When single product number will be used
+            $searchSplit = array_filter(explode('~', $kgt_ref_number));
+            if (count($searchSplit) > 1) {
+                $kgt_ref_number = $searchSplit[0];
+                $searchItemValue = $searchSplit[1];
+                $searchItemType = isset($searchSplit[3]) ? $searchSplit[3] : '';
+                if ($searchItemType == 'product_model' || $searchItemType == 'model') {
+                    $searchModelIds = isset($searchSplit[2]) ? explode(',', $searchSplit[2]) : array();
+                    if (count($searchModelIds) > 0) {
+                        $this->db->select('group_concat(DISTINCT(maker_id)) as maker_id');
+                        $this->db->where_in('id', $searchModelIds);
+                        $tbl_models = $this->db->get('tbl_models')->row_array();
+                        $searchMakerIds = $tbl_models['maker_id'] ? explode(',', $tbl_models['maker_id']) : array();
+                        $this->session->set_userdata(array('searchMakerIds' => $searchMakerIds, 'searchModelIds' => $searchModelIds));
+                    }
+                }
+            }
+
+            // unset the quick search filter options
+            $this->session->unset_userdata('search_by');
+
+            $kgt_ref_number = urldecode($kgt_ref_number); // decode the product number from browser url
+            $kgt_ref_number = str_replace("-s-", "'s", $kgt_ref_number);
+            // $search_product_id = $this->product_model->getProductIdByPartNumber($kgt_ref_number); // get the product id based on part number
+            // $parent_product_id = $this->product_model->getParentProductId($search_product_id); // get the parent product id based on product id
+            //echo $kgt_ref_number;
+
+            // Get the single product details based on selected part number from search form
+            $productinfo = updateLanguageParameters($this->product_model->productByKGTRefNo($kgt_ref_number, $this->lang->default_lang_id));
+          //  $ar_productinfo = $this->product_model->ar_productByKGTRefNo($kgt_ref_number, $this->lang->default_lang_id);
+           // echo '<pre>';print_r($ar_productinfo);
+          //  echo '<pre>';print_r($productinfo);
+            $store_data = $this->comman_model->get_store_wise_quantity($productinfo[0]->id);
+           //  echo '<pre>';print_r($store_data);exit;
+
+            $products_counts = sizeof($productinfo);
+            if (is_array($productinfo)) {
+
+                $productselected = true;
+
+                // $product_items = $this->product_items_model->getproductitems_data();
+                // $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+
+                $products = getCartProductDetails($productinfo); // get the product details along with related model data and child data
+                $products = json_decode(json_encode($products));
+                // echo "<pre>";
+                // print_r($products);
+                // die;
+
+                $session_data = array(
+                    'product_number' => $kgt_ref_number,
+                );
+                $this->session->set_userdata($session_data); // Assign the level based ids into session
+
+            }
+        } else {
+
+            // if user clicked model name based breadcrumb link from the product type page this code will execute
+            if ($kgt_ref_number == 'select') {
+                // if params related to maker and model and category id is exist in the url than this code  execute
+                $maker_id = array($selected_maker_id);
+                $this->session->set_userdata(array('maker_id' => $maker_id));
+
+                $vehicle_category_ids = $this->product_model->get_product_category_by_maker_id(array($selected_maker_id));
+                $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+                $maker_id = array($selected_maker_id);
+                $this->session->set_userdata(array('model_id' => $model_id));
+            }
+            //end if all params in url
+
+            // on submit the product type page this condition  executed
+            $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+            $maker_id = $this->session->userdata('maker_id');
+            $model_id = $this->session->userdata('model_id');
+
+            if ($this->input->post('product_type')) {
+                // if product type post variable is set than this condition works
+
+                $this->session->unset_userdata('qProduct_year');
+                $this->session->unset_userdata('qEngineSize');
+                $this->session->unset_userdata('qProductTypeId');
+
+                $product_type_array = $this->security->xss_clean($this->input->post('product_type'));
+                $model_id = array_diff($model_id, array(''));
+
+                $maker_id_array = array_filter(array_unique($maker_id));
+                $model_id_array = array_filter(array_unique($model_id));
+                $product_type = array_filter(array_unique($product_type_array));
+                // this function set product type id values in the session
+                $this->session->set_userdata(array('product_type' => $product_type));
+            } else if (!empty($this->session->userdata('product_type'))) {
+                //product_type already set in the session than this condition execute
+                $product_type = $this->session->userdata('product_type');
+            }
+
+            //  if product type array is  empty than this code exectue and  redirects to products model  page
+            if (empty($product_type)) {
+                redirect('products/product_items');
+            }
+
+            // if user not search any data then this code will execute
+            if ($productselected == false) {
+
+                // this fucntion get list of products as per the data in the session and above conditions
+                $products_counts = $this->product_model->get_products_count();
+                // if ($products_counts == 0) {
+                //     $returnAllProduct = 1;
+                // }
+                $products = updateLanguageParameters($this->product_model->get_products_by_makers_cats_pair('list', $this->lang->default_lang_id, $this->config->item('pagination_limit_product_list_frist_page'), $offset, $returnAllProduct));
+
+                // pass products and count related to it to view files
+                $products = getCartProductDetails($products);
+                $products = json_decode(json_encode($products));
+
+                $product_items = $this->product_items_model->getproductitems_data();
+                $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+            }
+        }
+
+        // Get the cart data and cleanup and reasssign
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+
+        $this->session->set_userdata('cart', $cart);
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        // this function generate breadcrumb for the view
+        $bread_data = $this->breadcrumb();
+        $breadcrumb = $bread_data[0] . $bread_data[1] . $bread_data[2];
+
+        // Get the data from database based on language
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+
+        // initialize data as Array to assign all required values for view files
+        $pageData = array(
+            'title' => get_page_title('product_list_page'),
+            'pageType' => 'productlist',
+            'productsdropdown' => true,
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'session_data' => $this->session->all_userdata(),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cart_data' => $cart,
+            'cartcount' => getcartcount($cart),
+            'offset' => $offset,
+            'products_counts' => $products_counts,
+            'product_items' => $product_items,
+            'product_model_items' => $product_model_items,
+            'products' => $products,
+            'returnAllProduct' => $returnAllProduct,
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'maker_id' => $maker_id,
+            'model_id' => $model_id,
+            'product_type' => $product_type,
+            'menu_vehicle_categories' => $this->comman_model->all_data('tbl_vehicle_categories'),
+            //      'menu_product_types'                => $this->comman_model->get_product_type_for_menu(),
+            'searchItemValue' => $searchItemValue,
+            'searchItemType' => $searchItemType,
+            'store_data' => $store_data
+        );
+
+	$pageData['all_data']['related_products'] = $this->product_model->get_related_productsComplex(trim($products[0]->product_models[0]->seo_meta_keywords),$products[0]->id);
+        //Starting of SEO Module added by SUJAN MAHARJAN
+        if(count($products)<2){
+            $pageData['all_data']['seo_meta_desc'] = $products[0]->product_models[0]->seo_meta_desc;
+            $pageData['all_data']['seo_meta_keywords'] = $products[0]->product_models[0]->seo_meta_keywords;
+            $pageData['title'] = get_page_title('product_list_page')."-".$products[0]->product_models[0]->seo_model_name;
+        }
+        //Ending of SEO MODULE code
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        //echo '<pre>';  print_r($pageData);   exit;
+        $this->load->view('common/products_header', $pageData);
+        $this->load->view('product/product_list', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    /**
+     * Method breadcrumb
+     *
+     * This Function generate breadcrumb for all products functions according to  selected makers, models and category.
+     * @return void
+     */
+    public function breadcrumb()
+    {
+
+        // get function get category,maker and model ids from the session
+        $vehicle_category_ids = $this->session->userdata('vehicle_category_id') ? array_filter(array_unique($this->session->userdata('vehicle_category_id'))) : array();
+        $maker_ids = $this->session->userdata('maker_id') ? array_filter(array_unique($this->session->userdata('maker_id'))) : array();
+        $model_ids = $this->session->userdata('model_id') ? array_filter(array_unique($this->session->userdata('model_id'))) : '';
+	    $product_number = $this->session->userdata('product_number') ? $this->session->userdata('product_number') : '';
+
+        // declare variables
+        $cat_breadcrumb = '';
+        $maker_breadcrumb = '';
+        $model_breadcrumb = '';
+        $br2 = '';
+        $model_final = "";
+        $product_breadcrumb = "";
+        $disable_multi_select = $this->config->item('disable_multiselect')?"1":"0";
+	
+	if($this->session->userdata('filter_option') == 'industry-type'){
+            $industry_ids = $this->session->userdata('industry_type');
+            $industries_id_string = implode(",",$industry_ids);
+            if(count($industry_ids)>0){
+                $industry_breadcrumb = $this->comman_model->getAllById('industries',$industry_ids,array('name'),'id');
+                $industry_array = array();
+                foreach ($industry_breadcrumb as $ind){
+                    $industry_array[] = $ind['name'];
+                }
+                
+                $industry_breadcrumb = implode(' - ',$industry_array);
+                return array('<a>'.$industry_breadcrumb.'</a>','','');
+            }
+        }else if($this->session->userdata('filter_option') == 'product-group'){
+            $prod_type_ids = $this->session->userdata('product_type');
+            $prod_type_id_string = implode(",",$prod_type_ids);
+            if(count($prod_type_ids)>0){
+                $prod_type_breadcrumb = $this->comman_model->getAllById('tbl_product_types',$prod_type_ids,array('product_type_name'),'id');
+                $prod_type_array = array();
+                foreach ($prod_type_breadcrumb as $ptype){
+                    $prod_type_array[] = $ptype['product_type_name'];
+                }
+                
+                $prod_type_breadcrumb = implode(' - ',$prod_type_array);
+                return array('<a>'.$prod_type_breadcrumb.'</a>','','');
+            }
+        }
+
+	if($this->session->userdata('vehicle_category_id')==NULL){
+            if($this->session->userdata('maker_id')==NULL){
+                if($this->session->userdata('model_id')==NULL){
+		    $product_breadcrumb = $this->comman_model->get_breadcrumbProductName($product_number);                    
+		    $product_breadcrumb = '<a>'.$product_breadcrumb.'</a>'; 
+                    return array($product_breadcrumb,'','');
+                }
+            } 
+        }
+        // this function executes when categories are not empty in the session
+        if ($this->session->userdata('hide_category') == 0|| true || $this->session->userdata('search_cat') == 1) { // check category enabled or not based on the admin selection
+            if (!empty($vehicle_category_ids)) {
+
+                $cat_breadcrumbs = '';
+                $cat_count = 0;
+                $previous_v_c_id = array();
+
+                $categoryBreadcrumb = $this->comman_model->get_breadcrumbcategorydetailsbyid($vehicle_category_ids, $this->lang->default_lang_id);
+
+                // this loop iterate each category and make breadcrumb html
+                foreach ($vehicle_category_ids as $key1 => $vehicle_category_id) {
+
+                    if (!in_array($vehicle_category_id, $previous_v_c_id)) {
+                        $previous_v_c_id[] = $vehicle_category_id;
+
+                        if ($cat_count > 0) {
+                            // html string of category  breadcrumb
+                            $cat_breadcrumbs .= ' - ' . '<a  class="bread_cat" href="' . base_url() . $this->lang->default_lang . '/products/' .($disable_multi_select==1?"category_details":"vehicle_type"). '/' . $vehicle_category_id . '">' . $categoryBreadcrumb[$vehicle_category_id] . '</a>';
+                        } else {
+                            // html string of category  breadcrumb
+                            $cat_breadcrumbs .= '<a class="bread_cat" href="' . base_url() . $this->lang->default_lang . '/products/'.($disable_multi_select==1?"category_details":"vehicle_type").'/' . $vehicle_category_id . '">' . $categoryBreadcrumb[$vehicle_category_id] . '</a>';
+                        }
+
+                        $cat_count++;
+                    }
+                }
+                $cat_breadcrumb .= $cat_breadcrumbs;
+            }
+        }
+
+        // this function executes when makers are not  empty in the session
+        if (!empty($maker_ids)) {
+            
+            $maker_breadcrumb = '';
+            $maker_count = 0;
+            $current_nav = '';
+
+            $makerBreadcrumb = $this->comman_model->get_breadcrumbmakerdetailsbyidformodelpage($maker_ids, $this->lang->default_lang_id);
+            
+            $br2 = array();
+            // this loop iterate each maker and make breadcrumb html
+            foreach ($maker_ids as $key2 => $maker_id) {
+                // html string of models breadcrumb
+                $maker = $this->product_model->get_product_maker_data_by_id(array($maker_id));
+                if($disable_multi_select){
+                    $br2[] = '<a class="bread_maker" href="' . base_url() . $this->lang->default_lang . '/products/maker_details/' . $maker_id . '">#' . $maker_id . '#</a>';
+                }else{
+                    $br2[] = '<a class="bread_maker" href="' . base_url() . $this->lang->default_lang . '/products/product_maker/' . $maker_id . '">#' . $maker_id . '#</a>';
+                }
+                
+            }
+
+            if ($this->session->userdata('hide_category') == 0 || true) {
+                $br2 = ' / ' . implode(' - ', $br2);
+            } else {
+                $br2 = implode(' - ', $br2);
+            }
+            if ($br2) {
+                $makerBreadcrumb = $this->comman_model->get_breadcrumbmakerdetailsbyidformodelpage($maker_ids, $this->lang->default_lang_id);
+                foreach ($makerBreadcrumb as $makerId => $bread) {
+                    $br2 = str_replace('#' . $makerId . '#', $bread, $br2);
+                }
+            }
+        }
+
+        // this function executes when models are not  empty in the session
+        if (!empty($model_ids)) {
+            $modelList = $this->product_model->getModelListByMakerId($maker_ids);
+            $model_br = array();
+            foreach ($modelList as $model) {
+                if (in_array($model['model_id'], $model_ids)) {
+                    $model_br[] = '<a   class="bread_model" href="' . base_url() . $this->lang->default_lang . '/products/product_model/' . $model['maker_id'] . '/' . $model['model_id'] . '">#' . $model['model_id'] . '#</a>';
+                }
+            }
+
+            $model_breadcrumb = array_unique($model_br);
+            $model_final = ' / ' . implode(' - ', $model_breadcrumb);
+            if ($model_breadcrumb) {
+                $modelBreadcrumb = $this->comman_model->get_breadcrumbmakerdetailsbyidforitempage($model_ids, $this->lang->default_lang_id);
+                foreach ($modelBreadcrumb as $modelId => $breadmodel) {
+                    $model_final = str_replace('#' . $modelId . '#', $breadmodel, $model_final);
+                }
+            }
+        }
+
+        return array($cat_breadcrumb, $br2, $model_final);
+    }
+
+    /**
+     * Method checkItemInCartAjax
+     * This Function Executed on adding new product in the cart.
+     * @return void
+     */
+    public function checkItemInCartAjax()
+    {
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction'), $this->lang->default_lang_id);
+
+        $selection_instruction = (object) $userLangData['selection_instruction'];
+        $general_instruction = (object) $userLangData['general_instruction'];
+
+        // this function read product id from the post variable
+        $product_ids = $this->security->xss_clean($this->input->post('product_id'));
+
+        $carts = $this->session->userdata('cart');
+        $number_product = is_array($carts) ? count($carts) : 0;
+        $existingCartItems = array();
+        if ($number_product > 0) {
+            foreach ($carts as $cart) {
+                $existingCartItems[] = $cart['item_id'];
+            }
+        }
+
+        $status = 0;
+        $productcount = 0;
+        $ignorecount = 0;
+
+        $message = '';
+        $refname = '';
+        $ignorename = '';
+        $product = '';
+
+        $productnamesarr = array();
+        $productlimitarr = array();
+        $cart_product = array();
+        // this function run each product id from input value
+        foreach ($product_ids as $product_id) {
+            if ((in_array($product_id, $existingCartItems)) || ($number_product >= getenv('CART_NUMBER'))) {
+                //if item is matched with the existing cart item than this condition works
+                $productcount++;
+
+                $status = 1;
+
+                if ($product != '') {
+                    $product .= ',';
+                }
+
+                $product .= $product_id;
+
+                $productname = $this->product_model->getProductNameById($product_id);
+
+                if (in_array($product_id, $existingCartItems)) {
+
+                    // add product number in the array
+                    $productnamesarr[] = $productname;
+                } else if ($number_product >= getenv('CART_NUMBER')) {
+                    //if max cart product number is less than cart number
+                    if (!in_array($productname, $productlimitarr)) {
+                        // this function append product number in the array
+                        $productlimitarr[] = $productname;
+                        $ignorecount++;
+                    }
+                }
+
+                $ignore_items = explode(",", $product);
+                if (in_array($product_id, $ignore_items)) {
+                    // if product already exist in the array than ignore it
+                } else {
+                    $number_product++;
+                }
+            } else {
+                // if cart is empty than this condition work
+                if ($number_product >= getenv('CART_NUMBER')) {
+                    //if max cart product number is less than cart number
+
+                    $productname = $this->product_model->getProductNameById($product_id);
+                    if (!in_array($productname, $productlimitarr)) {
+                        // this function append product number in the array
+                        $productlimitarr[] = $productname;
+                        $ignorecount++;
+                    }
+                }
+
+                $number_product++;
+            }
+        }
+
+        // this code make string for the already added string
+        $i = 1;
+
+        foreach ($productnamesarr as $productname) {
+
+            if ($refname != '') {
+
+                if ($i == $productcount) {
+                    $refname .= ' and ';
+                } else {
+                    $refname .= ', ';
+                }
+
+            }
+
+            $refname .= $productname;
+
+            $i++;
+        }
+
+        // this code make String for the ignored string due to max cart limit
+
+        $k = 1;
+
+        foreach ($productlimitarr as $productname) {
+
+            if ($ignorename != '') {
+
+                if ($k == $ignorecount) {
+                    $ignorename .= ' and ';
+                } else {
+                    $ignorename .= ', ';
+                }
+
+            }
+
+            $ignorename .= $productname;
+
+            $k++;
+        }
+
+        // this function make string for the message in the pop related to conditions
+        $phrase = ($productcount > 1 ? $general_instruction->are_text : $general_instruction->is_text);
+        $phrase1 = ($productcount > 1 ? $general_instruction->items : $general_instruction->item);
+        $phrase2 = ($productcount > 1 ? $general_instruction->these : $general_instruction->this);
+        $phrase3 = ($productcount > 1 ? $general_instruction->them : $general_instruction->it);
+
+        if ($refname == '') {
+            $message = '';
+        } else {
+            $message = $selection_instruction->already_exist_msg;
+            $message = preg_replace('/\bPHRASE\b/', $phrase, $message);
+            $message = preg_replace('/\bPHRASEITEM\b/', $phrase1, $message);
+            $message = preg_replace('/\bPHRASETHIS\b/', $phrase2, $message);
+            $message = str_replace("PHRASEIT", $phrase3, $message);
+            $message = str_replace("REFNAME", $refname, $message);
+        }
+        $ignphrase = ($ignorecount > 1 ? $general_instruction->are_text : $general_instruction->is_text);
+        $ignphrase1 = ($ignorecount > 1 ? $general_instruction->items : $general_instruction->item);
+        $ignphrase2 = ($ignorecount > 1 ? $general_instruction->these : $general_instruction->this);
+        $ignphrase3 = ($ignorecount > 1 ? $general_instruction->them : $general_instruction->it);
+
+        if ($ignorename == '') {
+            $ignore_message = '';
+        } else {
+            // this code replace variable in the message string
+            $ignore_message = isset($selection_instruction->cart_limit_ignored) ? $selection_instruction->cart_limit_ignored : "";
+            $ignore_message = preg_replace('/\bPHRASE\b/', $ignphrase, $ignore_message);
+            $ignore_message = preg_replace('/\bPHRASEITEM\b/', $ignphrase1, $ignore_message);
+            $ignore_message = preg_replace('/\bPHRASETHIS\b/', $ignphrase2, $ignore_message);
+            $ignore_message = str_replace("{cart_number}", getenv('CART_NUMBER'), $ignore_message);
+            $ignore_message = str_replace("PHRASEIT", $ignphrase3, $ignore_message);
+            $ignore_message = str_replace("REFNAME", $ignorename, $ignore_message);
+
+            $message .= $ignore_message;
+        }
+
+        // this function set cart message in the session
+        $this->session->set_userdata('cart_msg', $message);
+        $data = array('status' => $status, 'product' => $product, "number_product" => $number_product);
+        // this function return json
+        echo json_encode($data);
+    }
+
+    /**
+     * get_makers
+     *  This Function return makers on the behalf of offset and category for set by the load more button.
+     * @param  mixed $offset
+     * @return void
+     */
+    public function get_makers($offset)
+    {
+        // get category id from the session
+        $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+        if (empty($vehicle_category_ids)) {
+            // if category in the session is empty than intialize the empty array.
+            $vehicle_category_ids = array();
+        }
+
+        $pageData = array(
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)), // get list of countries from the database table
+            'product_maker' => $this->product_model->get_product_maker_by_machine_id($vehicle_category_ids, $offset), // this function get makers from the database using category and offset
+        );
+        // this function load view for the makers page
+        $this->load->view('product/get_makers', $pageData);
+    }
+
+    /**
+     * get_vehicle_categories
+     *  This Function return categories  on the behalf of offset for set by the load more button.
+     * @param  mixed $offset
+     * @return void
+     */
+    public function get_vehicle_categories($offset)
+    {
+        // this function read category ids and product types ids
+        $vehicle_category_ids = $this->session->userdata('vehicle_category_id');
+        $product_type_id = $this->session->userdata('product_type_id');
+
+        $pageData = array(
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'product_type_id' => $product_type_id,
+            'vehicle_categories' => $this->comman_model->get_vehicle_type_for_menu($offset, $vehicle_category_ids, $product_type_id), // this function load categories on the behalf of product type, category and offset
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)), // get list of countries from the database table
+        );
+
+        // this function load view for the category page
+        $this->load->view('product/get_vehicle_categories', $pageData);
+    }
+
+    /**
+     * Method get_menu_product_types
+     *
+     * This Function return product types on the behalf of offset set by the load more button.
+     * @param $offset
+     *
+     * @return void
+     */
+    public function get_menu_product_types($offset)
+    {
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        // this function load product types from database using offset
+        $this->comman_model->update_column('home_page',array(),array('quick_search_hide_category'=>'0'));
+        $pageData['menu_product_types'] = $this->comman_model->get_product_type_for_menu($offset);
+
+        $pageData['selection_instruction'] = (object) $userLangData['selection_instruction'];
+        $pageData['general_instruction'] = (object) $userLangData['general_instruction'];
+        $pageData['product_instruction'] = (object) $userLangData['product_instruction'];
+
+        // this is view file for product types
+        $this->load->view('product/get_product_types', $pageData);
+    }
+
+    /**
+     * Method get_home_product
+     *
+     * This Function return product list on home page on the behalf of offset set by the load more button.
+     * @param $offset
+     *
+     * @return void
+     */
+    public function get_home_product($offset, $sort = "")
+    {
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        // this function load product types from database using offset
+        $pageData['product_list'] = $this->product_model->product_list_home($this->lang->default_lang_id, $offset, $sort);
+        $pageData['selection_instruction'] = (object) $userLangData['selection_instruction'];
+        $pageData['general_instruction'] = (object) $userLangData['general_instruction'];
+        $pageData['product_instruction'] = (object) $userLangData['product_instruction'];
+
+        // this is view file for product types
+        $this->load->view('product/get_home_product', $pageData);
+    }
+
+    /**
+     * Method get_brand_types
+     *
+     * This Function return product brand types on the behalf of offset set by the load more button.
+     * @param $offset
+     *
+     * @return void
+     */
+    public function get_brand_types($offset)
+    {
+        // this function load product types from database using offset
+        $pageData['makers_list'] = $this->comman_model->get_maker_type_for_menu($offset);
+        $pageData['disable_multiselect'] = ($this->config->item('disable_multiselect')?"1":"0"); 
+        // this is view file for product types
+        // echo '<pre>';print_r($pageData);echo '</pre>';exit;
+        $this->load->view('product/get_brand_types', $pageData);
+    }
+
+    /**
+     * Method get_models
+     *
+     * This Function return models on the behalf  makerid and offset set by the load more button.
+     * @param $offset
+     *
+     * @return void
+     */
+    public function get_models($offset)
+    {
+        // get makers ids from session
+        $maker_id = $this->session->userdata('maker_id');
+        // is makers id array is empty than declare empty array
+        if ($maker_id == false) {
+            $maker_id = array();
+        }
+
+        $pageData = array(
+            'maker_id' => $maker_id,
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)), // get list of countries from the database table
+            'models' => $this->product_model->get_model_by_makers_details($offset), // this function get models from the database using makers  and offset
+        );
+
+        // this function load view for the models page
+        $this->load->view('product/get_models', $pageData);
+    }
+
+    /**
+     * Method get_product_list
+     *
+     * This function get product  list  on the behalf of  data  in session and offset set by the load more button
+     * @param $offset $offset [explicite description]
+     *
+     * @return void
+     */
+    public function get_product_list($offset)
+    {
+
+        $pageData = array(
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'pageType' => 'get_product_list',
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)), // get list of countries from the database table
+            'products' => updateLanguageParameters($this->product_model->get_products_by_makers_cats_pair('list', $this->lang->default_lang_id, $this->config->item('pagination_limit_product_list_frist_page'), $offset)), // this function get data from the database
+            'cart_data' => $this->session->userdata('cart'),
+            'all_data' => allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country')),
+        );
+
+        // this function generate the view
+        $this->load->view('product/get_product_list', $pageData);
+    }
+
+    /**
+     * Method getProducts
+     *
+     *  This function get product  list  on the behalf of  data  in session and offset set by the load more button on product list page
+     * @return void
+     */
+    public function getProducts()
+    {
+        $limit = $this->security->xss_clean($this->input->post('limit'));
+        $offset = $this->security->xss_clean($this->input->post('offset'));
+        $returnAllProduct = $this->security->xss_clean($this->input->post('returnAllProduct'));
+
+        // this function get all products as per session values and offset
+        $products = updateLanguageParameters($this->product_model->get_products_by_makers_cats_pair('list', $this->lang->default_lang_id, $limit, $offset, $returnAllProduct));
+        $products = getCartProductDetails($products);
+        $products = json_decode(json_encode($products));
+        $product_items = $this->product_items_model->getproductitems_data();
+        $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+
+        // this code  get data from database abd session which is required for view file
+        $userLangData = get_user_lang_data(array('cart_instruction', 'product_instruction', 'general_instruction','admin_static_links'), $this->lang->default_lang_id);
+
+        $pageData = array(
+            'pageType' => 'getProducts',
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'all_data' => allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country')),
+            'cart_data' => $this->session->userdata('cart'),
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],          
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'offset' => $offset,
+            'checkbox' => $this->security->xss_clean($this->input->post('checkbox')),
+            'product_items' => $product_items,
+            'product_model_items' => $product_model_items,
+            'products' => $products,
+            'searchItemValue' => '',
+        );
+
+        $this->load->view('product/get_product_list', $pageData);
+    }
+
+    /**
+     * Method getProducts
+     *
+     *  This function get product  list  on the behalf of  data  in session and offset set by the load more button on product list page
+     * @return void
+     */
+    public function getAjaxChildProducts()
+    {
+        $product_id = $this->security->xss_clean($this->input->post('product_id'));
+        $type = $this->security->xss_clean($this->input->post('type'));
+        $element_number = $this->security->xss_clean($this->input->post('element_number'));
+
+        $product_number = $this->comman_model->get_data_by_id("products", array("id" => $product_id));
+
+        if ($type == "child") {
+            $products = $this->product_model->getProductChild($product_id, $this->lang->default_lang_id);
+        } else {
+            $products = $this->product_model->getProductParent($product_id, $this->lang->default_lang_id);
+        }
+
+        $products = json_decode(json_encode($products));
+
+        // this code  get data from database abd session which is required for view file
+        $userLangData = get_user_lang_data(array('cart_instruction', 'product_instruction', 'general_instruction'), $this->lang->default_lang_id);
+        $product_items = $this->product_items_model->getproductitems_data();
+        $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+
+        $comingsoon = getNoImage('coming-soon');
+        $i = 1;
+
+        $parent_word = $userLangData['general_instruction']['parent_of'];
+
+        $result = "";
+
+        foreach ($products as $child) {
+            $number = $element_number . "." . $i;
+            $data['product'] = $child;
+            $data['view_type'] = "0";
+            $data['count'] = 0;
+            if ($type == "child") {
+                $data['child_open'] = 1;
+            } else {
+                $number = $parent_word . $product_number['kgt_ref_number'];
+                $data['child_open'] = 2;
+            }
+            $data['i'] = $number;
+            $data['product_instruction'] = (object) $userLangData['product_instruction'];
+            $data['general_instruction'] = (object) $userLangData['general_instruction'];
+            $data['product_items'] = $product_items;
+            $data['product_model_items'] = $product_model_items;
+            $data['searchItemValue'] = "";
+            $data['comingsoon'] = $comingsoon;
+            $data['colors'] = $this->comman_model->get_row_array('front_colors', '*', array('id' => 1))[0];
+            $data['all_data'] = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+           
+            $this->load->view('product/product_element', $data);
+            $i++;
+        }
+    }
+
+    /**
+     * Method ar_getAjaxChildProducts
+     *
+     *  This function get product  list  on the behalf of  data  in session and offset set by the load more button on product list page
+     * @return void
+     */
+    public function ar_getAjaxChildProducts()
+    {
+        // log_message('debug', 'ar_getAjaxChildProducts called');
+        // log_message('debug', '$_GET: ' . print_r($_GET, true));
+        // log_message('debug', '$_POST: ' . print_r($_POST, true));
+        log_message('debug', 'ar_getAjaxChildProducts called');
+        log_message('debug', 'GET Params: ' . print_r($this->input->get(), true));
+
+        header('Content-Type: text/html; charset=utf-8'); // Ensure HTML content type
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        $product_id = $this->security->xss_clean($this->input->get('product_id'));
+        $type = $this->security->xss_clean($this->input->get('type'));
+       // $element_number = $this->security->xss_clean($this->input->get_post('element_number'));
+        $element_number = $this->security->xss_clean($this->input->get('element_number'));
+
+        // Ensure it only contains valid numeric or dot-separated values
+        if (!preg_match('/^\d+(\.\d+)*$/', $element_number)) {
+            log_message('error', 'Invalid element_number: ' . $element_number);
+            echo 'Invalid request parameters.';
+            return;
+        }
+       // echo " $product_id || $type || $element_number";
+        if (empty($product_id) || empty($type)) {
+            //echo json_encode(['error' => 'Invalid request.']);return;       
+            // Return error if parameters are missing
+            echo 'Invalid request parameters.'; return;
+        }
+    
+
+        $product_number = $this->comman_model->get_data_by_id("products", array("id" => $product_id));
+
+        if ($type == "child") {
+            $ar_display_type='child';
+            $products = $this->product_model->getProductChild($product_id, $this->lang->default_lang_id);
+        } else {
+            $ar_display_type='parent';
+            $products = $this->product_model->getProductParent($product_id, $this->lang->default_lang_id);
+        }
+       
+        $products = json_decode(json_encode($products));
+
+        // this code  get data from database abd session which is required for view file
+        $userLangData = get_user_lang_data(array('cart_instruction', 'product_instruction', 'general_instruction'), $this->lang->default_lang_id);
+        $product_items = $this->product_items_model->getproductitems_data();
+        $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+
+        $comingsoon = getNoImage('coming-soon');
+        $i = 1;
+
+        $parent_word = $userLangData['general_instruction']['parent_of'];
+
+        $result = "";
+
+        foreach ($products as $child) {
+           // echo "3";
+
+           if($ar_display_type == 'parent' && $element_number =='1'){
+            $number = $element_number;
+           }else{
+            $number = $element_number . "." . $i;
+           }
+            
+            $data['product'] = $child;
+            $data['view_type'] = "0";
+            $data['ar_display_type']=$ar_display_type;
+            $data['count'] = 0;
+            if ($type == "child") {
+                $data['child_open'] = 1;
+            } else {
+               // $number = $parent_word . $product_number['kgt_ref_number'];
+                $data['child_open'] = 2;
+            }
+            $data['i'] = $number;
+            $data['product_instruction'] = (object) $userLangData['product_instruction'];
+            $data['general_instruction'] = (object) $userLangData['general_instruction'];
+            $data['product_items'] = $product_items;
+            $data['product_model_items'] = $product_model_items;
+            $data['searchItemValue'] = "";
+            $data['comingsoon'] = $comingsoon;
+            $data['colors'] = $this->comman_model->get_row_array('front_colors', '*', array('id' => 1))[0];
+            $data['all_data'] = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+            //AR
+            $data['parent_products'] = $this->product_model->getProductParent($child->id, $this->lang->default_lang_id);
+            $data['child_products'] = $this->product_model->getProductChild($child->id, $this->lang->default_lang_id);
+        
+     
+           
+            //$this->load->view('product/product_element', $data);
+              if ($child->template == "2") {
+                    $result .= $this->load->view('product/product_element_ar2', $data, true);
+                   //$result .= $this->load->view('product/product_element_ar', $data, true);
+              }else{
+                    $result .= $this->load->view('product/product_element_ar', $data, true);
+                   
+              }
+          
+            $i++;
+        }
+        // Return the rendered HTML
+        echo $result;
+        return;
+        //echo json_encode(['html' => $result]);return;
+    }
+    /**
+     * Method industry_type
+     *
+     * This Function display industry  before products in back form.
+     * @param $vehicle_category_id $vehicle_category_id [explicite description]
+     *
+     * @return void
+     */
+    public function industry_type($industry_id = '')
+    {
+
+        logged_user_validation();
+
+        $this->session->unset_userdata('search_engine_size');
+
+        $vehicle_category_ids = array();
+        if ($industry_id) {
+
+            $this->session->unset_userdata('vehicle_category_id');
+            $this->session->unset_userdata('search_cat');
+            //$this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('maker_id');
+            $this->session->unset_userdata('model_id');
+            $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+            $this->session->unset_userdata('product_type');
+            $this->session->unset_userdata('maker_cat_id_pair');
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('searchMakerIds');
+            $this->session->unset_userdata('searchModelIds');
+            $this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('isQSearch');
+            // if vehicle category id is set than this  condition executed and set values in the session
+
+            if ($this->session->userdata('hide_category') == 0) {
+                $vehicle_category_ids = $this->comman_model->get_category_by_industry($industry_id);
+                $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+
+            }
+
+            $this->session->unset_userdata('search_by');
+            $this->session->set_userdata(array('industry_type' => $industry_id));
+            $this->session->set_userdata(array('filter_option' => 'industry-type'));
+
+        }
+
+        $industry_type = $this->session->userdata('industry_type');
+        // this code  get list of industry and count of industry
+        $industry_list = $this->comman_model->get_industry_for_menu(0, $industry_type);
+        $num_industry_list = $this->comman_model->num_get_industry_for_menu($industry_type);
+
+        // this function generate breadcrumb for the view
+        $breadcrumbs = $this->breadcrumb();
+        $breadcrumb = $breadcrumbs[0];
+        $breadcrumb .= ($breadcrumb != '') ? '/' : '';
+        // $breadcrumb .= $breadcrumbs[1];
+
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+
+        $pageData = array(
+            'title' => get_page_title('product_page'),
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'industry_list' => $industry_list,
+            'num_industry_list' => $num_industry_list,
+            'pageType' => 'products',
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/product_industry', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    /**
+     * Method vehicle_type
+     *
+     * This Function display categories after submit the product type from the products page.
+     * @param $vehicle_category_id $vehicle_category_id [explicite description]
+     *
+     * @return void
+     */
+    public function vehicle_type($vehicle_category_id = '')
+    {
+
+        logged_user_validation();
+
+        $this->session->unset_userdata('search_engine_size');        
+        $vehicle_category_ids = array();
+        if ($vehicle_category_id) {
+
+            $this->session->unset_userdata('vehicle_category_id');
+            $this->session->unset_userdata('search_cat');
+            //$this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('maker_id');
+            $this->session->unset_userdata('model_id');
+            $this->session->unset_userdata('vehicle_maker_id_and_cat_id_pair');
+            $this->session->unset_userdata('product_type');
+            $this->session->unset_userdata('maker_cat_id_pair');
+            $this->session->unset_userdata('search_by');
+            $this->session->unset_userdata('searchMakerIds');
+            $this->session->unset_userdata('searchModelIds');
+            $this->session->unset_userdata('filter_option');
+            $this->session->unset_userdata('isQSearch');
+            // if vehicle category id is set than this  condition executed and set values in the session
+            $vehicle_category_ids = explode(',', $vehicle_category_id);
+            $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids, 'search_cat' => 1));
+            $this->session->unset_userdata('search_by');
+        }
+
+        $vehicle_category_ids = $this->session->userdata('vehicle_category_id') ? $this->session->userdata('vehicle_category_id') : array();
+        $product_type_id = $this->session->userdata('product_type');
+
+        if ($this->input->post('filter_option')) {
+            $this->session->set_userdata('filter_option', $this->input->post('filter_option'));
+        }
+
+        if ($this->input->post('filter_option') == "industry-type") {
+            $industry_type = $this->security->xss_clean($this->input->post('industry_type'));
+            $this->session->set_userdata(array('industry_type' => $industry_type));
+            // $vehicle_category_ids = $this->comman_model->get_category_by_industry($industry_type);
+            $vehicle_categories = $this->comman_model->get_vehicle_type_for_ind(0, $industry_type);
+            $num_vehicle_type_for_menu = $this->comman_model->num_get_vehicle_type_for_ind($industry_type);
+            // $this->session->set_userdata(array('vehicle_category_id' => $vehicle_category_ids));
+            $this->session->set_userdata(array('industry_type' => $industry_type));
+
+            unset($_POST['product_type_id']);
+        } else if ($this->input->post('product_type_id_drp')) {
+            // on submit the product type from products page this condition executed
+            $product_type_id = array_filter($this->input->post('product_type_id_drp'));
+
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => $product_type_id, 'search_by' => 'product_type'));
+
+            $vehicle_categories = $this->comman_model->get_vehicle_type_for_menu(0, $vehicle_category_ids, $product_type_id);
+            $num_vehicle_type_for_menu = $this->comman_model->num_vehicle_type_for_menu($vehicle_category_ids, $product_type_id);
+
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => $product_type_id, 'search_by' => 'product_type'));
+        } else if ($this->input->post('product_type_id')) {
+            // on submit the product type from products page this condition executed
+            $product_type_id = array_filter($this->input->post('product_type_id'));
+
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => $product_type_id, 'search_by' => 'product_type'));
+
+            $vehicle_categories = $this->comman_model->get_vehicle_type_for_menu(0, $vehicle_category_ids, $product_type_id);
+            $num_vehicle_type_for_menu = $this->comman_model->num_vehicle_type_for_menu($vehicle_category_ids, $product_type_id);
+
+            // this code set product type in the session
+            $this->session->set_userdata(array('product_type' => $product_type_id, 'search_by' => 'product_type'));
+        } else {
+            if (empty($product_type_id) && empty($vehicle_category_ids)) {
+                redirect('products');
+            }
+            $vehicle_categories = $this->comman_model->get_vehicle_type_for_menu(0, $vehicle_category_ids, $product_type_id);
+            $num_vehicle_type_for_menu = $this->comman_model->num_vehicle_type_for_menu($vehicle_category_ids, $product_type_id);
+        }
+
+        // this function generate breadcrumb for the view
+        $breadcrumbs = $this->breadcrumb();
+	$breadcrumb = $breadcrumbs[0];
+	$breadcrumb .= ($breadcrumbs[1] != '') ? ' / '.$breadcrumbs[1] : '';
+        $breadcrumb .= ($breadcrumbs[2] != '') ? ' / '.$breadcrumbs[2] : '';
+
+        $cart = $this->session->userdata('cart');
+        $cart = cartCleanUp($cart);
+        $this->session->set_userdata('cart', $cart);
+
+        //block end  - in cart and product section sometimes this is $last_inserted_cart_block_id getting false as the timer isn't showing. to make that more confirm i did this code.
+        $last_inserted_cart_block_id = getLastInsertedCartBlockId();
+        if ($last_inserted_cart_block_id) {
+            $current_cart_user_data = $this->comman_model->get_data_by_id('cart_block_users', array('id' => $last_inserted_cart_block_id));
+        }
+
+        $all_data = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+        $all_navigation_data = $this->comman_model->GetAllDataLangByNavIdStatus('navigation_pages', 'status', 1, $this->lang->default_lang_id, 'navigation_pages_country');
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+
+        $pageData = array(
+            'title' => get_page_title('product_page'),
+            'timestamp' => date_timestamp_get(date_create()),
+            'country_data' => $this->comman_model->get_row_array('country', '*', array('status' => 1)),
+            'countries' => allCountryDataArray($this->comman_model->GetAllCountryDataLangByid($this->lang->default_lang_id)),
+            'lang_id' => $this->lang->default_lang,
+            'lang_num' => $this->lang->default_lang_id,
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'front_validuser_data' => $this->session->userdata('front_validuser_data'),
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'selection_instruction' => (object) $userLangData['selection_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'],
+            'cart_instruction' => (object) $userLangData['cart_instruction'],
+            'cart_timer' => (object) $userLangData['cart_timer'],
+            'admin_static_links' => $userLangData['admin_static_links'],
+            'current_cart_user_data' => $current_cart_user_data,
+            'edit_cart_mode' => isset($current_cart_user_data['cartmode']) ? $current_cart_user_data['cartmode'] : '',
+            'last_inserted_cart_block_id' => $last_inserted_cart_block_id,
+            'breadcrumb' => $breadcrumb,
+            'cartcount' => getcartcount($cart),
+            'vehicle_category_ids' => $vehicle_category_ids,
+            'product_type_id' => $product_type_id,
+            'vehicle_categories' => $vehicle_categories,
+            'num_vehicle_type_for_menu' => $num_vehicle_type_for_menu,
+            'pageType' => 'products',
+        );
+
+        $footerData = array(
+            'all_data' => $all_data,
+            'all_navigation_data' => $all_navigation_data,
+            'all_social_media_data' => $this->comman_model->GetAllDataLangByNavIdStatus('social_media', 'status', 1, $this->lang->default_lang_id, 'social_media_country'),
+        );
+
+        $this->load->view('common/header', $pageData);
+        $this->load->view('product/vehicle_type', $pageData);
+        $this->load->view('common/footer', $footerData);
+    }
+
+    /**
+     * Method get_vehicle_maker_categories
+     *
+     * This function get maker list  on the behalf of categories in session and offset set by the load more button
+     * @param $offset $offset [explicite description]
+     *
+     * @return void
+     */
+    public function get_vehicle_maker_categories($offset)
+    {
+        $userLangData = get_user_lang_data(array('general_instruction'), $this->lang->default_lang_id);
+        $pageData = array(
+            'selected_vehicle_categories' => $this->product_model->getMakerListByCategoryId($this->session->userdata('vehicle_category_id'), $offset), // this function get maker list id from the categories and offset
+            'general_instruction' => (object) $userLangData['general_instruction'], // this function return frontend instructions manageable from the admin side
+            'maker_ids' => '',
+        );
+
+        // this function load view of the category ppage
+        $this->load->view('product/get_category_maker_list', $pageData);
+    }
+
+    /**
+     * Method get_ajax_vehicle_maker_list
+     *
+     * This function get maker list  on the behalf of single category and offset  set by the load more button.
+     * @param $categoryId $categoryId [explicite description]
+     * @param $offset $offset [explicite description]
+     *
+     * @return void
+     */
+    public function get_ajax_vehicle_maker_list($categoryId, $offset)
+    {
+        $pageData = array(
+            'makers' => $this->product_model->getMakerListBySingleCategory($categoryId, $offset), // This function get maker list  on the behalf of single  category and offset  set by the load more button.
+            'category_id' => $categoryId,
+            'maker_ids' => '',
+        );
+
+        // this function load view file
+        $this->load->view('product/get_ajax_maker_list', $pageData);
+    }
+
+    /**
+     * Method get_ajax_model_category_list
+     *
+     * This function get models list  on the behalf of category, makers, types from session  and offset  set by the load more button.
+     * @param $offset $offset [explicite description]
+     *
+     * @return void
+     */
+    public function get_ajax_model_category_list($offset)
+    {
+        $userLangData = get_user_lang_data(array('general_instruction'), $this->lang->default_lang_id);
+        $pageData = array(
+            'general_instruction' => (object) $userLangData['general_instruction'], // this function return frontend instructions those  are  manageable from the admin side
+            'modelList' => updateLanguageParameters($this->product_model->get_model_by_makers_details($offset, $this->lang->default_lang_id)), //this function get model  list on the behalf of  session data and offset from database
+            'model_id' => '',
+        );
+
+        // this function load view for the models
+        $this->load->view('product/get_category_model_list', $pageData);
+    }
+
+    /**
+     * Method get_ajax_model_maker_list
+     *
+     *  This function get maker list  on the behalf of category and offset  set by the load more button.
+     * @param $type $type [explicite description]
+     * @param $categoryId $categoryId [explicite description]
+     * @param $offset $offset [explicite description]
+     * @param $makerId $makerId [explicite description]
+     *
+     * @return void
+     */
+    public function get_ajax_model_maker_list($type = 'maker', $offset, $categoryId, $makerId = '')
+    {
+        $userLangData = get_user_lang_data(array('general_instruction'), $this->lang->default_lang_id);
+        $pageData = array(
+            'general_instruction' => (object) $userLangData['general_instruction'], // this function return frontend instructions those  are  manageable from the admin side
+            'model_id' => '',
+            'category_id' => $categoryId,
+            'type' => $type,
+        );
+
+        if ($type == 'maker') {
+            // this function get maker  list on the behalf of  categories and offset from database
+            $pageData['model'] = updateLanguageParameters($this->product_model->get_model_makers_by_categoryId($categoryId, $offset, $this->lang->default_lang_id));
+        } else if ($type == 'model') {
+            // this function get models list on the behalf of  categories and offset from database
+            $pageData['models'] = updateLanguageParameters($this->product_model->get_model_makers_by_category_makerId($categoryId, $makerId, $offset, $this->lang->default_lang_id));
+            $pageData["maker_id"] = $makerId;
+        }
+
+        // this function load view for the models
+        $this->load->view('product/get_ajax_model_maker_list', $pageData);
+    }
+
+    /**
+     * Method get_ajax_product_item_list
+     *
+     * This function get product type list  on the behalf of models  and offset set by the load more button.
+     * @param $type $categoryId [explicite description]
+     * @param $offset $offset [explicite description]
+     * @param $categoryId $categoryId [explicite description]
+     *
+     * @return void
+     */
+    public function get_ajax_product_item_list($type = 'category', $offset, $categoryId = '')
+    {
+        $userLangData = get_user_lang_data(array('general_instruction', 'product_instruction'), $this->lang->default_lang_id);
+        $pageData = array(
+            'general_instruction' => (object) $userLangData['general_instruction'],
+            'product_instruction' => (object) $userLangData['product_instruction'], // this function return frontend instructions those  are  manageable from the admin side
+            'product_type_id' => '',
+            'type' => $type,
+        );
+
+        if ($type == 'category') {
+            // this function get product types list on the behalf of  categories and offset from database
+            $pageData['productgroup'] = updateLanguageParameters($this->product_model->get_product_types_from_model($offset, $this->lang->default_lang_id));
+        } else if ($type == 'items') {
+            // this function get product types list on the behalf of  categories and offset from database
+            $pageData['items'] = updateLanguageParameters($this->product_model->get_product_types_by_categoryId($categoryId, $offset, $this->lang->default_lang_id));
+            $pageData["category_id"] = $categoryId;
+        }
+
+        // this function load view for the types
+        $this->load->view('product/get_ajax_product_item_list', $pageData);
+    }
+
+    // get makers by product id
+
+    public function getMakerByProduct($product_id)
+    {
+        $countryId = $this->lang->default_lang_id;
+        $makers_data = updateLanguageParameters($this->product_model->getMakerByProduct($product_id, $countryId));
+        $comingsoon = getNoImage('coming-soon');
+        $selMakerIds = $this->session->userdata('searchMakerIds') ? array_filter($this->session->userdata('searchMakerIds')) : array();
+
+        // echo "<pre>";
+        // print_r($makers_data);die;
+        foreach ($makers_data as $makers) {
+
+            // echo $makers['maker_logo'];die;
+
+            if (isset($makers['maker_logo']) && $makers['maker_logo'] != '' && file_exists("assets/uploads/product_maker/" . $makers['maker_logo'])) {
+                $maker_logo = '<img class="brandmodeltitlelogo px-2" src=" ' . asset_url() . '/assets/uploads/product_maker/' . $makers['maker_logo'] . '" data-img="' . asset_url() . '/assets/uploads/product_maker/' . $makers['maker_logo'] . '" alt="' . $makers['maker_logo'] . '" />';
+            } else {
+                $maker_logo = '<img class="brandmodeltitlelogo px-2" src="' . $comingsoon . '" data-img="' . $comingsoon . '" alt="coming soon" />';
+            }
+
+            // $show_class = (in_array($makers['id'], $selMakerIds) || empty($selMakerIds))? 'show': '';
+
+            $maker_html .= '<span> <h1 class="nomargin"> <span class="font22pxarial"> <div id="accordion" class="accordion float-start w-100"> <div class="accordion-item float-start w-100 mb-2">
+            <h2 class="accordion-header" id="heading' . $makers['id'] . '"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse' . $product_id . '_' . $makers['id'] . '" aria-expanded="false" aria-controls="collapse' . $makers['id'] . '" onclick = "getModels(' . $product_id . ', ' . $makers['id'] . ')"><span class="Checkbox_brand">' . $makers['maker_name'] . ' </span> ' . $maker_logo . '</button></h2><div id="collapse' . $product_id . '_' . $makers['id'] . '" class="accordion-collapse collapse" aria-labelledby="heading' . $makers['id'] . '" data-bs-parent="#accordion-model"><div class="accordion-body d-flex float-start w-100 flex-wrap" id = "model_data_' . $product_id . '_' . $makers['id'] . '"> </div></div> </div> </div> </span> </h1> </span>
+            <div style="padding-top:2px;"></div>';
+        }
+
+        echo $maker_html;
+    }
+
+    // get models by product id and maker id
+
+    public function getModelByMakerId($maker_id, $product_id)
+    {
+        $countryId = $this->lang->default_lang_id;
+        $model_data = updateLanguageParameters($this->product_model->getModelByMaker($maker_id, $product_id, $countryId));
+        $comingsoon = getNoImage('coming-soon');
+        $selModelIds = $this->session->userdata('searchModelIds') ? array_filter($this->session->userdata('searchModelIds')) : array();
+
+        $model_html = '';
+
+        foreach ($model_data as $model) {
+
+            if (isset($model['model_photo']) && $model['model_photo'] != '' && file_exists("assets/uploads/product_model/" . $model['model_photo'])) {
+                $model_image = '<img class="brandmodeltitlelogo px-2" src="assets/uploads/product_model/' . $model['model_photo'] . '" data-img="assets/uploads/product_model/' . $model['model_photo'] . '" alt="' . $model['model_photo'] . '" />';
+            } else {
+                $model_image = '<img class="brandmodeltitlelogo px-2" src="' . $comingsoon . '" data-img="' . $comingsoon . '" alt="coming soon" />';
+            }
+            $model_html .= '<div id="accordion-model" class="accordion w-100 mb-2"><div class="accordion-item float-start w-100"><h2 class="accordion-header" id="heading' . $model['id'] . '"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse' . $model['id'] . '" aria-expanded="false" aria-controls="collapse' . $model['id'] . '" onclick="getProductModelItems(' . $product_id . ', ' . $maker_id . ',' . $model['id'] . ');"><span class="Checkbox_brand">' . $model['model_name'] . '</span>' . $model_image . '</button></h2><div id="collapse' . $model['id'] . '" class="accordion-collapse collapse" aria-labelledby="heading' . $model['id'] . '" data-bs-parent="#accordion-model"><div  id="product_tems_' . $product_id . '_' . $maker_id . '_' . $model['id'] . '">
+
+            </div></div></div></div>';
+        }
+
+        echo $model_html;
+    }
+
+    // get models by product id and maker id
+
+    public function getProductModelItems($model_id, $product_id)
+    {
+        $countryId = $this->lang->default_lang_id;
+        $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+
+        $product_items_arr = $this->product_items_model->product_model_maker_with_attributes($product_id, $model_id, $countryId);
+
+        // echo "<pre>";
+        //     print_r($product_items_arr);
+        // exit;
+
+        $product_item_html = '';
+
+        if (isset($product_model_items) && !empty($product_items_arr)) {
+            $year_size = $product_model_items[0];
+            $engine_size = $product_model_items[1];
+            $position = $product_model_items[2];
+            $vehi_attr = $product_model_items[3];
+            $app_size = $product_model_items[4];
+
+            $tempYear = [];
+            $manufactYear = '';
+            $engineSizes = '';
+            foreach ($product_items_arr as $productItem) {
+                if (!in_array($productItem['value'], $tempYear)) {
+                    $manufactYear .= '<option value="' . $productItem['value'] . '">' . $productItem['value'] . '</option>';
+                    $tempYear[] = $productItem['value'];
+
+                    $engineVal = (($productItem['lang_engine_size']) && $productItem['lang_engine_size']) ? $productItem['lang_engine_size'] : $productItem['engine_size'];
+                    $positionVal = (($productItem['lang_position']) && $productItem['lang_position']) ? $productItem['lang_position'] : $productItem['position'];
+                    $vehAttrVal = (($productItem['lang_vehicle_attributes']) && $productItem['lang_vehicle_attributes']) ? $productItem['lang_vehicle_attributes'] : $productItem['vehicle_attributes'];
+                    $appNotesVal = (($productItem['lang_application_notes']) && $productItem['lang_application_notes']) ? $productItem['lang_application_notes'] : $productItem['application_notes'];
+
+                    if (isset($tempYear[0]) && $tempYear[0] == $productItem['value']) {
+                        $engineSizes .= '<option value="' . $engineVal . '" position="' . $positionVal . '" attributes="' . $vehAttrVal . '" notes="' . $appNotesVal . '">' . $engineVal . '</option>';
+                    }
+
+                }
+
+            }
+
+            $yearVal = (($year_size['lang_item_name']) && $year_size['lang_item_name']) ? $year_size['lang_item_name'] : $year_size['item_name'];
+            $engineSizeVal = (($engine_size['lang_item_name']) && $engine_size['lang_item_name']) ? $engine_size['lang_item_name'] : $engine_size['item_name'];
+            $positionVal = (($position['lang_item_name']) && $position['lang_item_name']) ? $position['lang_item_name'] : $position['item_name'];
+            $vehiclAttrVal = (($vehi_attr['lang_item_name']) && $vehi_attr['lang_item_name']) ? $vehi_attr['lang_item_name'] : $vehi_attr['item_name'];
+            $appSizeVal = (($app_size['lang_item_name']) && $app_size['lang_item_name']) ? $app_size['lang_item_name'] : $app_size['item_name'];
+
+            $defaultPosition = (($productItem[0]['lang_position']) && $productItem[0]['lang_position']) ? $productItem[0]['lang_position'] : $productItem[0]['position'];
+
+            $defaultPositionStyleAttr = (!$defaultPosition) ? 'style=display:none;' : '';
+
+            $defaultAppNote = (($productItem[0]['lang_application_notes']) && $productItem[0]['lang_application_notes']) ? $productItem[0]['lang_application_notes'] : $productItem[0]['application_notes'];
+
+            $defaultAppNoteStyleAttr = (!$defaultAppNote) ? 'style=display:none;' : '';
+
+            $defaultVehAttr = (($productItem[0]['lang_vehicle_attributes']) && $productItem[0]['lang_vehicle_attributes']) ? $productItem[0]['lang_vehicle_attributes'] : $productItem[0]['vehicle_attributes'];
+
+            $defaultVehAttrStyleAttr = (!$defaultVehAttr) ? 'style=display:none;' : '';
+
+            $product_item_html .= '<div id="collapse100" class="accordion-collapse collapse show" aria-labelledby="heading100" data-bs-parent="#accordion-model">
+                <div class="accordion-body d-flex float-start w-100 flex-wrap">
+                <div class="single_detail">
+                    <span style="font-size:' . $year_size['item_text_size'] . 'px;color:#' . $year_size['item_text_color'] . ' !important; ">
+                    ' . $yearVal . ' :</span>
+                    <span>
+                        <select style="padding:0px; width: 100px;color:#' . $year_size['item_text_color'] . ' !important;border-color:#' . $year_size['item_text_color'] . ' !important;" class="model_attr_change ' . $product_id . '_' . $model_id . '_' . $year_size['id'] . '" data-sid="' . $product_id . '_' . $model_id . '_' . $year_size['id'] . '" name="product_item_model_dropdown[' . $product_id . '][' . $model_id . '][' . $year_size['id'] . ']">
+                            ' . $manufactYear . '
+                        </select>
+                    </span>
+                </div>
+                <div class="single_detail">
+                <span style="font-size:' . $engine_size['item_text_size'] . 'px;color:#' . $engine_size['item_text_color'] . ' !important; ">
+                    ' . $engineSizeVal . ' :</span>
+                    <span>
+                        <select style="padding:0px; width: 100px;color:#' . $engine_size['item_text_color'] . ' !important;border-color:#' . $engine_size['item_text_color'] . ' !important;" class="model_engine_change ' . $product_id . '_' . $model_id . '_' . $engine_size['id'] . '" data-sid="' . $product_id . '_' . $model_id . '_' . $year_size['id'] . '" name="product_item_model_dropdown[' . $product_id . '][' . $model_id . '][' . $engine_size['id'] . ']">
+                            ' . $engineSizes . '
+                        </select>
+                    </span>
+                </div>
+                <div class="single_detail  engineattr_' . $product_id . '_' . $model_id . '  engineattr_main_' . $product_id . '_' . $model_id . '_' . $position['id'] . '" ' . $defaultPositionStyleAttr . '>
+                <span style="font-size:' . $position['item_text_size'] . 'px;color:#' . $position['item_text_color'] . ' !important; ">
+                    ' . $positionVal . ' :</span>
+                    <span class="engineattr_value_' . $product_id . '_' . $model_id . '_' . $position['id'] . '">' . $defaultPosition . '</span>
+
+                </div>
+                <div class="single_detail  engineattr_' . $product_id . '_' . $model_id . '   engineattr_main_' . $product_id . '_' . $model_id . '_' . $vehi_attr['id'] . '" ' . $defaultVehAttrStyleAttr . '>
+                <span style="font-size:' . $vehi_attr['item_text_size'] . 'px;color:#' . $vehi_attr['item_text_color'] . ' !important; ">
+                    ' . $vehiclAttrVal . ' :</span>
+                    <span class="engineattr_value_' . $product_id . '_' . $model_id . '_' . $vehi_attr['id'] . '">' . $defaultVehAttr . '
+                    </span>
+
+                </div>
+                <div class="single_detail  engineattr_' . $product_id . '_' . $model_id . '   engineattr_main_' . $product_id . '_' . $model_id . '_' . $app_size['id'] . '" ' . $defaultAppNoteStyleAttr . '>
+                <span style="font-size:' . $app_size['item_text_size'] . 'px;color:#' . $app_size['item_text_color'] . ' !important; ">
+                    ' . $appSizeVal . ' :</span>
+                    <span class="engineattr_value_' . $product_id . '_' . $model_id . '_' . $app_size['id'] . '">' . $defaultAppNote . '</span>
+
+                </div>
+                <input type="hidden" class="attr-exist" value="collapse-model-100">
+                </div>
+            </div>';
+        } else {
+            $product_item_html = 'No Result Found';
+        }
+
+        echo $product_item_html;
+    }
+
+    public function getProductList_drop()
+    {
+
+        $search = $this->input->post('search');
+
+        $page = $this->input->post('page') ? $this->input->post('page') - 1 : 0;
+        $offset = $page ? $page * $this->config->item('pagination_limit_product_list_frist_page') : 0;
+        // This Function return list of all product types according to parameter passed
+
+        $type_details = $this->product_model->product_list_dropdown($this->config->item('pagination_limit_product_list_frist_page'), $offset, $search);
+
+        if ($search) {
+            $total_count = $this->product_model->get_products_count($search);
+        } else {
+            $total_count = $this->input->post('total_count');
+        }
+        $response = array();
+
+        if (!empty($this->session->userdata('cart'))) {
+            $cart = $this->session->userdata('cart');
+        } else {
+            $cart = [];
+        }
+
+        // this code run product type data in foreach loop and geneate html of each option
+        foreach ($type_details as $key => $type) {
+
+            // if image is exist than set image else coming soon image will be set
+            $pro_real_images = explode(",", $type['item_real_photo']);
+
+            if (isset($pro_real_images[0]) && $pro_real_images[0] != '' && file_exists("assets/uploads/product_images/" . $pro_real_images[0])) {
+
+                $img = asset_url('assets/uploads/product_images/' . $pro_real_images[0]);
+            } else {
+                $img = getNoImage('coming-soon');
+            }
+
+            $selected = '';
+
+            // condition to display product type name as per default language
+            $product_type_name = $type['kgt_ref_number'];
+
+            $single_item = array("id" => $type['id'], "text" => ucwords($type['kgt_ref_number']), "img" => $img);
+
+            if (array_key_exists($type['id'], $cart)) {
+                $single_item['selected'] = true;
+            }
+
+            $items[] = $single_item;
+            // Assign the response key & value to return json
+
+        }
+        $data['items'] = $items;
+        $data['total_count'] = $total_count;
+        // $data = $items;
+        // return the json response
+        echo json_encode($data);
+        exit;
+    }
+    // ################ Added for SEO by SUJAN ################
+    function get_home_product_link()
+    {
+
+        $userLangData = get_user_lang_data(array('general_instruction', 'selection_instruction', 'cart_instruction', 'product_instruction', 'admin_static_links', 'cart_timer'), $this->lang->default_lang_id);
+        // this function load product types from database using offset
+        $pageData['product_list'] = $this->product_model->product_link_home($this->lang->default_lang_id, $offset,$sort);
+        $pageData['selection_instruction']  = (object)$userLangData['selection_instruction'];
+        $pageData['general_instruction']    = (object)$userLangData['general_instruction'];
+        $pageData['product_instruction']    = (object)$userLangData['product_instruction'];
+
+        // this is view file for product types        
+        $product_list = $pageData['product_list'];
+        foreach ($product_list as $single_product) {            
+            
+            $url_link = (base_url() . ($lang_id?$lang_id.'/':'')  . 'products/product_list/' . $single_product->kgt_ref_number.'/'.urlencode($single_product->product_type_name).'-'.str_replace("%2F","-",urlencode(trim($single_product->part_name))) );
+            echo '<url><loc>'.$url_link.'</loc></url>';
+            
+        } 
+    }
+    // ################## END of SEO by SUJAN ####################
+
+    function updatePostalCode(){
+         // Check user logged or not
+         logged_user_validation();
+
+         // this code save post input values in the variable
+         $manual_postal_code = $this->input->post('manual_postal_code');
+         $this->session->set_userdata("manual_postal_code",$manual_postal_code);  
+         echo '<pre>'       ;
+         print_r($this->input->post());
+         print_r($this->session);
+    }
+
+
+    public function ar_showChildProducts()
+    {
+       // echo __FILE__;exit;
+        $product_id = $this->security->xss_clean($this->input->get_post('product_id'));
+        $type = $this->security->xss_clean($this->input->get_post('type'));
+        $element_number = $this->security->xss_clean($this->input->get_post('element_number'));
+
+        $product_number = $this->comman_model->get_data_by_id("products", array("id" => $product_id));
+        //echo "product_id: $product_id, type: $type, element_number: $element_number <br/>";
+    
+        if ($type == "child") {
+            $products = $this->product_model->getProductChild($product_id, $this->lang->default_lang_id);
+        } else {
+            $products = $this->product_model->getProductParent($product_id, $this->lang->default_lang_id);
+        }
+       // echo "product_id: $product_id, type: $type, element_number: $element_number <br/>";  print_r($products);        exit;
+        $products = json_decode(json_encode($products));
+
+        // this code  get data from database abd session which is required for view file
+        $userLangData = get_user_lang_data(array('cart_instruction', 'product_instruction', 'general_instruction'), $this->lang->default_lang_id);
+        $product_items = $this->product_items_model->getproductitems_data();
+        $product_model_items = $this->product_items_model->getproductitems_data("product_model");
+
+        $comingsoon = getNoImage('coming-soon');
+        $i = 1;
+
+        $parent_word = $userLangData['general_instruction']['parent_of'];
+
+        $result = "";
+
+        foreach ($products as $child) {
+            $number = $element_number . "." . $i;
+            $data['product'] = $child;
+            $data['view_type'] = "0";
+            $data['count'] = 0;
+            if ($type == "child") {
+                $data['child_open'] = 1;
+            } else {
+                $number = $parent_word . $product_number['kgt_ref_number'];
+                $data['child_open'] = 2;
+            }
+            $data['i'] = $number;
+            $data['product_instruction'] = (object) $userLangData['product_instruction'];
+            $data['general_instruction'] = (object) $userLangData['general_instruction'];
+            $data['product_items'] = $product_items;
+            $data['product_model_items'] = $product_model_items;
+            $data['searchItemValue'] = "";
+            $data['comingsoon'] = $comingsoon;
+            $data['colors'] = $this->comman_model->get_row_array('front_colors', '*', array('id' => 1))[0];
+            $data['all_data'] = allDataArray($this->comman_model->GetAllDataLangByid('home_page', 'id', 1, $this->lang->default_lang_id, 'home_page_country'));
+            $this->load->view('product/product_element', $data);
+            $i++;
+        }
+    }
+}

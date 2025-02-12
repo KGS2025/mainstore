@@ -1,0 +1,319 @@
+<div class="content zerorightmargin">
+    <?php
+    if ($this->session->flashdata('success')) {
+        $msg = $this->session->flashdata('success');
+    ?>
+        <div class="notice outer">
+            <div class="note"><?php echo $msg; ?>
+            </div>
+        </div>
+    <?php
+    }
+    ?>
+    <div id="show_class" class="note displaynon"></div>
+    <div id="result"></div>
+    <div class="outer">
+        <div class="inner">
+            <div class="page-header">
+
+                <div class="body">
+                    <!-- Content container -->
+                    <div class="container">
+                        <!-- Default datatable -->
+                        <div class="block well margintop-30px">
+                            <div class="navbar">
+                                <div class="navbar-inner">
+                                    <h5>
+                                        <?php echo $admin_order_details['order_details']['admin']; ?>
+                                    </h5>
+                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?>
+                                        <div class="edit_text" style="display:block"></div>
+                                        <input type="text" value="<?php echo $admin_order_details['order_details']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/order_details'; ?>">
+                                    <?php } ?>
+                                    <a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/order_details/admin" class="fancybox multi_language_common_edit admin_globe">
+                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                    </a>
+                                    <?php if (isset($access['page_delete']) && $access['page_delete'] == 1) { ?>
+                                        <div class="pull-right">
+                                            <button id="delete_checked" class="deletebtn"><?php echo $admin_static_links['delete_all']['front']; ?>
+                                            </button>
+                                        </div>
+                                    <?php } ?>
+                                </div>
+                            </div>
+                            <div class="table-overflow">
+                                <div id="data-table_wrapper" class="dataTables_wrapper" role="grid">
+                                    <table aria-describedby="data-table_info" class="table table-striped dataTable" id="data-table">
+                                        <thead>
+                                            <tr role="row">
+                                                <th colspan="1" rowspan="1"><input id="delete_all_btn" type="checkbox" name="delete_option[]" value="all"></th>
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['srno']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['srno']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/srno'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/srno/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['order_date']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['order_date']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/order_date'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/order_date/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['name']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['name']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/name'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/name/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['email']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['email']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/email'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/email/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['country']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['country']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/country'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/country/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['telephone']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['telephone']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/telephone'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/telephone/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+                                             
+
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['amount']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['amount']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/amount'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/amount/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+
+
+                                            
+
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['quotation_number']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['quotation_number']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/quotation_number'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/quotation_number/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+
+                                                <th>
+                                                    <label class="control-label"><?php echo $admin_order_details['status']['admin']; ?></label>
+                                                    <?php if ($lang_id == $primary_lang && ((isset($access['page_add']) && $access['page_add'] == 1) || (isset($access['page_edit']) && $access['page_edit'] == 1))) { ?><div class="edit_text" style="display:block"></div>
+                                                        <input type="text" value="<?php echo $admin_order_details['status']['admin']; ?>" class="edit_input_text" style="display: none;">
+                                                        <input type="hidden" value="<?php echo base_url() . 'admin/' . $lang_id . '/multilangue/saveLanguageData/admin_order_details/status'; ?>">
+                                                    <?php } ?><a target="_blank" href="admin/<?php echo $lang_id; ?>/multilangue/saveLanguageDataByCountry/admin_order_details/status/admin" class="fancybox multi_language_common_edit admin_globe">
+                                                        <img src="assets/uploads/global.jpg" height="20" width="20">
+                                                    </a>
+                                                </th>
+
+                                            </tr>
+                                        </thead>
+
+                                        <tbody aria-relevant="all" aria-live="polite" role="alert">
+
+                                            <?php if (empty($all_data)) { ?>
+                                                <tr class="odd">
+                                                    <td class="dataTables" valign="top" colspan="5"><?php echo $admin_static_links['no_data_available']['front']; ?></td>
+                                                </tr>
+                                            <?php } ?>
+
+                                            <?php
+                                            if (isset($offset)) {
+                                                $i = $offset + 1;
+                                            } else {
+                                                $i = 1;
+                                            }
+                                            if (isset($all_data)) {
+                                                foreach ($all_data as $set_data) {
+                                                    $timestamp = $set_data->created_date;
+                                                    $splitTimeStamp = explode(" ", $timestamp);
+                                                    $date = $splitTimeStamp[0];
+                                                    $time = $splitTimeStamp[1];
+                                            ?>
+                                                    <tr class="odd">
+                                                        <td class="dataTables" valign="top">
+                                                            <input class="blocks" type="checkbox" name="delete_option[]" value="<?php echo $set_data->id; ?>">
+                                                        </td>
+                                                        <td class="dataTables" valign="top">
+                                                            <?php echo $i; ?>
+                                                        </td>
+                                                        <td class="dataTables" valign="top">
+                                                            <?php echo $date; ?>
+                                                        </td>
+
+                                                        <td class="dataTables" valign="top">
+                                                            <?php echo $set_data->user_name; ?>
+                                                        </td>
+                                                        <td class="dataTables" valign="top">
+                                                            <?php echo $set_data->email; ?>
+                                                        </td>
+                                                        <td class="dataTables" valign="top">
+                                                            <?php echo $set_data->country; ?>
+                                                        </td>
+                                                        <td class="dataTables" valign="top">
+                                                            <?php echo $set_data->telephone; ?>
+                                                        </td>
+                                                       
+                                                        <td class="dataTables" valign="top" class="width85px">
+                                                            <?php echo $set_data->amount . ' ' . $set_data->currency; ?>
+                                                        </td>
+
+                                                        <td class="dataTables" valign="top" class="width85px">
+                                                            <?php echo $set_data->order_number; ?>
+                                                        </td>
+                                                        
+
+
+
+                                                        <td class="dataTables" valign="top">
+
+
+                                                <?php echo getOrderStatus($set_data->order_status); ?>
+
+
+                                                        </td>
+
+
+                                                        <td class="dataTables" valign="top" class="width85px">
+                                                            <a href="admin/<?php echo $lang_id; ?>/orders/viewOrder/<?php echo $set_data->id; ?>/<?php echo $set_data->order_number; ?>"><?php echo $admin_static_links['static_view']['front']; ?>&nbsp;&nbsp;(<?php echo $set_data->count_of_cart; ?>)</a>&nbsp;&nbsp;
+                                                            <?php if (isset($access['page_delete']) && $access['page_delete'] == 1) { ?>
+                                                                <a href="admin/<?php echo $lang_id; ?>/orders/delete/<?php echo $set_data->id; ?>"><?php echo $admin_static_links['static_delete']['front']; ?></a>
+                                                            <?php } ?>
+
+                                                            <?php if ($set_data->invoiceStatus == 1) { ?>
+                                                                <a href="<?php echo base_url() . 'assets/uploads/invoice/Invoice_' . $set_data->invoice_number . '.pdf'; ?>"  download><?php echo $admin_static_links['download_invoice']['front']; ?> </a>
+                                                            <?php } ?>
+                                                        </td>
+                                                    </tr>
+                                            <?php
+                                                    $i++;
+                                                }
+                                            }
+                                            ?>
+
+                                            <tr>
+                                                <td colspan="17">
+                                                    <?php if (isset($links)) { ?>
+                                                        <p class="floatright"><?php echo $links; ?></p>
+                                                    <?php } ?>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- /default datatable -->
+
+
+                        <!-- Pickers -->
+                    </div>
+
+                    <!-- /pickers -->
+
+                </div>
+                <!-- /content container -->
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function order_status(id, value) {
+
+        $.ajax({
+            type: "POST",
+            url: "admin/<?php echo $lang_id; ?>/orders/update_status",
+            /* The country id will be sent to this file */
+            data: "id=" + id + "&status=" + value,
+            beforeSend: function() {
+
+            },
+            success: function(msg) {
+                alert('<?= $admin_static_links['data_successfully_updated']['front']; ?>');
+            }
+        });
+    }
+
+
+    $(document).ready(function() {
+
+
+
+
+        $("#delete_all_btn").click(function() {
+            if ($("#delete_all_btn").is(':checked')) {
+                $(".blocks").prop('checked', true);
+            } else {
+                $(".blocks").prop('checked', false);
+            }
+        });
+        $("#delete_checked").click(function() {
+            if ($('input.blocks:checkbox:checked').length) {
+                var msg = "<?php echo $admin_static_links['are_you_sure']['front']; ?>";
+                var answer = confirm(msg);
+                if (answer) {
+                    var blocksarray = [];
+                    $('input.blocks:checkbox:checked').each(function() {
+                        blocksarray.push($(this).val());
+                        $(this).parents('tr').hide();
+                    });
+                    var url = "admin/<?php echo $lang_id; ?>/orders/deleteAll";
+                    $.ajax({
+                        type: "POST",
+                        url: url,
+                        data: {
+                            'block_ids': blocksarray,
+                            'table': 'cart_users'
+                        },
+                        success: function(data) {
+                            $("#delete_all_btn").prop('checked', false);
+                        }
+                    });
+                }
+            } else {
+                alert("<?php echo $admin_static_links['please_select_alteast_one_item']['front']; ?>");
+            }
+        });
+
+    });
+</script>
+<script type="text/javascript">
+    function confirm_box() {
+        var answer = confirm("<?php echo $admin_static_links['are_you_sure']['front']; ?>");
+        if (!answer)
+            return false;
+    }
+</script>

@@ -1,0 +1,4 @@
+assets/
+application/config/config.php
+.env.development
+.env.production
