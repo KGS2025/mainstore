@@ -1,4 +1,7 @@
+# Ignore the assets directory
 assets/
+# Ignore the config.php file in the application/config directory
 application/config/config.php
+# Ignore the .env.development file
 .env.development
 .env.production
